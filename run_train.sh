@@ -3,10 +3,11 @@
 . /etc/profile.d/modules.sh
 gpus=$(/home/hltcoe/jfarris/tensorroad/get_cuda_visible_devices.py --num-gpus 1)
 export CUDA_VISIBLE_DEVICES=$gpus
+module load cuda11.0/toolkit/11.0.3
 #
 source deactivate
 #conda info --envs
-source activate pytorch-conda
+source activate xvec
 
 #
 env | sort
@@ -15,17 +16,17 @@ ulimit -a
 #
 
 # Point to source code
-CODEBASE="/home/hltcoe/amccree/src/pytorch-xvec"
+CODEBASE="/home/hltcoe/kkarra/pytorch-xvec"
 #CODEBASE="/home/hltcoe/amccree/src/pytorch-xvec/Releases/ver1_12"
 
 # Directories
-#FEATS='feats_preprocess'
-FEATS='feats'
-MODEL_DIR='./models'
+FEATS='feats_preprocess'
+#FEATS='feats'
+MODEL_DIR='/exp/kkarra/xvector-models'
 mkdir -p $MODEL_DIR
 #TRAIN_DIR='/expscratch/amccree/data/pytorch/train_combined'
 TRAIN_DIR='/expscratch/dgromero/train_egs/nb/fbank_64/train_feats'
-LOCAL_DIR='/scratch/dgromero/tmp_folder_fb64'
+LOCAL_DIR='/exp/kkarra/tmp_folder_fb64'
 
 # Flag to copy data to scratch disk first (takes 20 min)
 DATA_COPY=0
