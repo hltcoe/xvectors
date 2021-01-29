@@ -42,6 +42,10 @@ if [ -f "$LOCAL_DIR/$FEATS.ark" ]; then
 fi
 
 # Options
+# TODO: should you detect if the model config exists first, and if so, load that?
+MODEL_CFG = $HOME/speech/xvectors/cfg/v10_gauss_lnorm_adam_768_128_postvox_sgd.json
+cp $MODEL_CFG $MODEL_DIR
+
 #MODEL_OPTS=" --feature-dim=23 --embedding-dim=256 --layer-dim=256 --length_norm "
 #MODEL_OPTS=" --feature-dim=64 --embedding-dim=256 --layer-dim=512 --length_norm "
 MODEL_OPTS=" --feature-dim=64 --embedding-dim=512 --layer-dim=512 --length_norm "
@@ -110,5 +114,5 @@ $CODEBASE/train_from_feats.py $MODEL_OPTS $FRAME_OPTS $TRAIN_OPTS $ENROLL_OPTS $
     --log-interval=1000 \
     --train-portion=0.9 \
     --checkpoint-dir=$MODEL_DIR \
-    --config $HOME/speech/xvectors/cfg/v10_gauss_lnorm_adam_768_128_postvox_sgd.json \
+    --config $MODEL_CFG \
     $TRAIN_DIR/$FEATS.scp $TRAIN_DIR/utt2spk
