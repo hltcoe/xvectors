@@ -7,6 +7,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from plda_lib import plda, GaussLinear, GaussQuadratic
 
+from kaldi_feats_dataset import KaldiFeatsDataset, SpkrSplit
+
+import json
+
 logger = logging.getLogger(__name__)
 
 # Function to initialize model weights
@@ -147,7 +151,56 @@ class Xvector_embed(nn.Module):
 
 class Xvector9s(nn.Module):
 
-    def __init__(self, input_dim, layer_dim, embedding_dim, num_classes, LL='linear', N0=9, fixed_N=True, length_norm=False, r=0.9, enroll_type='Bayes', loo_flag=True, bn_momentum=0.1, log_norm=True, conf_flag=False, resnet_flag=True, embed_relu_flag=False):
+    @staticmethod
+    def xvector_arch_factory(config_f):
+        with open(config_f, 'r') as f:
+            xvec_config = json.load(f)
+
+        # required configuration
+        input_dim = xvec_config['input_dim']
+        layer_dim = xvec_config['layer_dim']
+        embedding_dim = xvec_config['embedding_dim']
+
+        LL = xvec_config.get('LL')
+        length_norm = xvec_config.get('length_norm', False)
+        resnet_flag = xvec_config.get('resnet_flag', True)
+        embed_relu_flag = xvec_config.get('embed_relu_flag', False)
+
+        # get num-classes from the data
+        feats_scp_fname = xvec_config['feats_scp_filename']
+        utt2spk_fname = xvec_config['utt2spk_filename']
+        train_portion = xvec_config['train_portion']
+        train_dataset = KaldiFeatsDataset(feats_scp_fname, utt2spk_fname)
+        if train_portion < 1.0:
+            train_dataset, _ = SpkrSplit(train_dataset, args.train_portion)
+        num_classes = train_dataset.spks
+
+        # optional configuration
+        N0 = xvec_config.get('N0', 9)
+        fixed_N = xvec_config.get('fixed_N', True)
+
+        r = xvec_config.get('r', 0.9)
+        enroll_type = xvec_config.get('enroll_type', 'Bayes')
+        loo_flag = xvec_config.get('loo_flag', True)
+        bn_momentum = xvec_config.get('bn_momentum', 0.1)
+        log_norm = xvec_config.get('log_norm', True)
+        conf_flag = xvec_config.get('conf_flag', False)
+
+
+        return Xvector9s(input_dim, layer_dim, embedding_dim, num_classes,
+                         LL=LL, N0=N0, fixed_N=fixed_N, length_norm=length_norm, r=r, enroll_type=enroll_type,
+                         loo_flag=loo_flag, bn_momentum=bn_momentum, log_norm=log_norm, conf_flag=conf_flag,
+                         resnet_flag=resnet_flag, embed_relu_flag=embed_relu_flag)
+
+
+    def __init__(self, input_dim, layer_dim, embedding_dim, num_classes, LL='linear', N0=9, fixed_N=True,
+                 length_norm=False, r=0.9, enroll_type='Bayes', loo_flag=True, bn_momentum=0.1, log_norm=True,
+                 conf_flag=False, resnet_flag=True, embed_relu_flag=False):
+        """
+        Notes:
+             1 - loo_flag should be a setter/getter, not in the constructor as it is set
+                 as training progresses
+        """
 
         super(Xvector9s, self).__init__()
         self.LL = LL

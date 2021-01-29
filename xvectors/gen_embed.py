@@ -8,6 +8,13 @@ from xvector_model import Xvector9s
 from xvector_model_dgr import X3
 from xvector_model_dgr2 import angular_ResNet
 
+def load_embed_model_from_cfg(config_f, device='cpu'):
+    model = Xvector9s.xvector_arch_factory(config_f).to(device)
+    model = load_model(model_file, model, device)
+
+    model.eval()
+    return model
+
 def load_embed_model(model_file, device='cpu'):
 
     logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)

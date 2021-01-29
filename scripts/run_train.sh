@@ -20,12 +20,15 @@ CODEBASE="/home/hltcoe/kkarra/pytorch-xvec"
 #CODEBASE="/home/hltcoe/amccree/src/pytorch-xvec/Releases/ver1_12"
 
 # Directories
-FEATS='feats_preprocess'
+#FEATS='feats_preprocess'
 #FEATS='feats'
+FEATS='feats_t'
 MODEL_DIR='/exp/kkarra/xvector-models'
 mkdir -p $MODEL_DIR
 #TRAIN_DIR='/expscratch/amccree/data/pytorch/train_combined'
-TRAIN_DIR='/expscratch/dgromero/train_egs/nb/fbank_64/train_feats'
+#TRAIN_DIR='/expscratch/dgromero/train_egs/nb/fbank_64/train_feats'
+TRAIN_DIR='/expscratch/amccree/data/pytorch/fbank_64/'
+
 LOCAL_DIR='/exp/kkarra/tmp_folder_fb64'
 
 # Flag to copy data to scratch disk first (takes 20 min)

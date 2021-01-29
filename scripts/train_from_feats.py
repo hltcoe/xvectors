@@ -242,8 +242,50 @@ def main():
                         help='training CE boost margin (default: 0)')
     parser.add_argument('--ResNet', action='store_true', default=False,
                         help='ResNet instead of TDNN (default False)')
+
+    # TODO: if we like the config file, you need to decide on one input interface, and perhaps
+    #  provide a converter rather than overwriting the args
+    parser.add_argument('--config', type=str, default=None,
+                        help='Config file, which either adds to configurations or overrides if'
+                             'they are set by flags')
    
     args = parser.parse_args()
+
+    if args.config is not None:
+        logger.warning("Overwriting some command line configurations with values specified in:" + args.config)
+        with open(args.config, 'r') as f:
+            cfg_override = json.load(f)
+        if 'input_dim' in cfg_override:
+            args.feature_dim = cfg_override['input_dim']
+        if 'layer_dim' in cfg_override:
+            args.layer_dim = cfg_override['layer_dim']
+        if 'embedding_dim' in cfg_override:
+            args.embedding_dim = cfg_override['embedding_dim']
+        if 'LL' in cfg_override:
+            args.LLtype = cfg_override['LL']
+        if 'length_norm' in cfg_override:
+            args.length_norm = cfg_override['length_norm']
+        if 'resnet_flag' in cfg_override:
+            args.ResNet = cfg_override['resnet_flag']
+        if 'embed_relu_flag' in cfg_override:
+            args.embed_relu_flag = cfg_override['embed_relu_flag']
+        if 'feats_scp_filename' in cfg_override:
+            args.feats_scp_filename = cfg_override['feats_scp_filename']
+        if 'utt2spk_filename' in cfg_override:
+            args.utt2spk_filename = cfg_override['utt2spk_filename']
+        if 'train_portion' in cfg_override:
+            args.train_portion = cfg_override['train_portion']
+        if 'N0' in cfg_override:
+            args.enroll_N0 = cfg_override['N0']
+        if 'r' in cfg_override:
+            args.enroll_R = cfg_override['r']
+        if 'enroll_type' in cfg_override:
+            args.enroll_type = cfg_override['enroll_type']
+        # NOTE: the following configurations are unused when constructing the XVector9s model ...
+        #      1 - bn_momentum
+        #      2 - log_norm
+        #      3 - conf_flag
+
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     logger.info("Use CUDA: %s", use_cuda)
@@ -264,7 +306,8 @@ def main():
         # Constant average frame size
         frame_length = (args.max_frames + args.min_frames) // 2
         logger.info("Fixed frame length %d", frame_length)
-    train_dataset = KaldiFeatsDataset(args.feats_scp_filename, args.utt2spk_filename, num_frames=frame_length, cost=args.train_cost, enroll_N0=args.enroll_N0)
+    train_dataset = KaldiFeatsDataset(args.feats_scp_filename, args.utt2spk_filename,
+                                      num_frames=frame_length, cost=args.train_cost, enroll_N0=args.enroll_N0)
 
     test_dataset = None
     test_cost = 'GaussLoss'
