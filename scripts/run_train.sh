@@ -110,4 +110,5 @@ $CODEBASE/train_from_feats.py $MODEL_OPTS $FRAME_OPTS $TRAIN_OPTS $ENROLL_OPTS $
     --log-interval=1000 \
     --train-portion=0.9 \
     --checkpoint-dir=$MODEL_DIR \
+    --config $HOME/speech/xvectors/cfg/v10_gauss_lnorm_adam_768_128_postvox_sgd.json \
     $TRAIN_DIR/$FEATS.scp $TRAIN_DIR/utt2spk
