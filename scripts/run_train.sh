@@ -16,18 +16,18 @@ ulimit -a
 #
 
 # Point to source code
-CODEBASE="/home/hltcoe/kkarra/pytorch-xvec"
+CODEBASE="/home/hltcoe/kkarra/speech/xvectors/"
 #CODEBASE="/home/hltcoe/amccree/src/pytorch-xvec/Releases/ver1_12"
 
 # Directories
-#FEATS='feats_preprocess'
+FEATS='feats_preprocess'
 #FEATS='feats'
-FEATS='feats_t'
+#FEATS='feats_t'
 MODEL_DIR='/exp/kkarra/xvector-models'
 mkdir -p $MODEL_DIR
 #TRAIN_DIR='/expscratch/amccree/data/pytorch/train_combined'
-#TRAIN_DIR='/expscratch/dgromero/train_egs/nb/fbank_64/train_feats'
-TRAIN_DIR='/expscratch/amccree/data/pytorch/fbank_64/'
+TRAIN_DIR='/expscratch/dgromero/train_egs/nb/fbank_64/train_feats'
+#TRAIN_DIR='/expscratch/amccree/data/pytorch/fbank_64/'
 
 LOCAL_DIR='/exp/kkarra/tmp_folder_fb64'
 
@@ -43,7 +43,7 @@ fi
 
 # Options
 # TODO: should you detect if the model config exists first, and if so, load that?
-MODEL_CFG = $HOME/speech/xvectors/cfg/v10_gauss_lnorm_adam_768_128_postvox_sgd.json
+MODEL_CFG=$HOME/speech/xvectors/cfgs/v10_gauss_lnorm_adam_768_128_postvox_sgd.json
 cp $MODEL_CFG $MODEL_DIR
 
 #MODEL_OPTS=" --feature-dim=23 --embedding-dim=256 --layer-dim=256 --length_norm "
@@ -109,7 +109,7 @@ if [ $DATA_COPY -eq 1 -a -n "$TMPDIR" ]; then
     fi
 fi
 
-$CODEBASE/train_from_feats.py $MODEL_OPTS $FRAME_OPTS $TRAIN_OPTS $ENROLL_OPTS $VALID_OPTS $OPTIM_OPTS $INIT_OPTS \
+$CODEBASE/scripts/train_from_feats.py $MODEL_OPTS $FRAME_OPTS $TRAIN_OPTS $ENROLL_OPTS $VALID_OPTS $OPTIM_OPTS $INIT_OPTS \
     --num-workers=2 \
     --log-interval=1000 \
     --train-portion=0.9 \

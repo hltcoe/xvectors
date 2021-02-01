@@ -7,7 +7,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 
-from kaldi_io import read_mat, read_mat_head, read_mat_data
+from xvectors.kaldi_io import read_mat, read_mat_head, read_mat_data
 
 
 logger = logging.getLogger(__name__)

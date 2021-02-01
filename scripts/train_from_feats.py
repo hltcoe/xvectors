@@ -9,16 +9,18 @@ import os
 #import torch.multiprocessing
 #torch.multiprocessing.set_sharing_strategy('file_system')
 
+import json
+
 import torch
 import torch.nn
 import torch.nn.functional as F
 import torch.optim as optim
-from summary import summary
 
-from kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, SpkrSplit
-from xvector_model import Xvector9s, train_with_freeze
-from plda_lib import ComputeLoss
-from utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, linear_up_downLR
+from xvectors.summary import summary
+from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, SpkrSplit
+from xvectors.xvector_model import Xvector9s, train_with_freeze
+from xvectors.plda_lib import ComputeLoss
+from xvectors.utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, linear_up_downLR
 
 logger = logging.getLogger(__name__)
 
