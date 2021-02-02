@@ -5,9 +5,9 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from plda_lib import plda, GaussLinear, GaussQuadratic
 
-from kaldi_feats_dataset import KaldiFeatsDataset, SpkrSplit
+from xvectors.plda_lib import plda, GaussLinear, GaussQuadratic
+from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSplit
 
 import json
 

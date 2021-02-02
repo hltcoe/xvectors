@@ -6,7 +6,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils import accuracy
+
+from xvectors.utils import accuracy
 
 logger = logging.getLogger(__name__)
 

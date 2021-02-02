@@ -1,14 +1,14 @@
 {
-  'input_dim': 64,
-  'layer_dim': 768,
-  'embedding_dim': 128,
+  "input_dim": 64,
+  "layer_dim": 768,
+  "embedding_dim": 128,
 
-  'feats_scp_filename': '/expscratch/amccree/data/pytorch/fbank_64/feats_t.scp',
-  'feats_ark_filename': '/expscratch/amccree/data/pytorch/fbank_64/feats_t.ark',
-  'train_portion': 0.9,
+  "feats_scp_filename": "/expscratch/dgromero/train_egs/nb/fbank_64/train_feats/feats_preprocess.scp",
+  "feats_ark_filename": "/expscratch/dgromero/train_egs/nb/fbank_64/train_feats/feats_preorocess.ark",
+  "train_portion": 0.9,
 
-  'LL': 'Gauss',
-  'length_norm': true,
-  'resnet_flag': false,
-  'embed_relu_flag': false
+  "LL": "Gauss",
+  "length_norm": true,
+  "resnet_flag": false,
+  "embed_relu_flag": false
 }
