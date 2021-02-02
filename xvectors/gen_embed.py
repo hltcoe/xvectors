@@ -3,10 +3,10 @@ import torch
 import numpy as np
 import logging
 
-from utils import load_model
-from xvector_model import Xvector9s
-from xvector_model_dgr import X3
-from xvector_model_dgr2 import angular_ResNet
+from xvectors.utils import load_model
+from xvectors.xvector_model import Xvector9s
+from xvectors.xvector_model_dgr import X3
+from xvectors.xvector_model_dgr2 import angular_ResNet
 
 def load_embed_model_from_cfg(config_f, device='cpu'):
     model = Xvector9s.xvector_arch_factory(config_f).to(device)
