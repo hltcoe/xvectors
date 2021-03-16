@@ -9,7 +9,7 @@ import torch.optim.lr_scheduler
 logger = logging.getLogger(__name__)
 
 
-def save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_dir, best_flag=False):
+def save_checkpoint(model, model_constructor_args, optimizer, scheduler, epoch, checkpoint_dir, best_flag=False):
     """
     Saving checkpoints
     :param epoch: current epoch number
@@ -24,8 +24,12 @@ def save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_dir, best_fla
     else:
         state_dict = model.state_dict()
 
+    # TODO: if you want to make this more general, save the module name
+    #  such that it can be imported dynamically
+    #  see: str_to_class below
     state = {
         'arch': arch,
+        'model_constructor_args': model_constructor_args,
         'epoch': epoch,
         'state_dict': state_dict,
         'optimizer': optimizer.state_dict(),
@@ -51,6 +55,7 @@ def save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_dir, best_fla
         torch.save(state, filename)
         logger.info("Saving best model: {} ...".format(filename))
 
+
 def resume_checkpoint(resume_path, model, optimizer, scheduler, device):
     """
     Resume from saved checkpoints
@@ -69,12 +74,34 @@ def resume_checkpoint(resume_path, model, optimizer, scheduler, device):
 
     return start_epoch, model, optimizer, scheduler
 
-def load_model(model_path, model, device):
+
+import importlib
+# Modified from: https://stackoverflow.com/a/24674853/1057098
+def str_to_class(module_name, class_name, class_kwargs={}):
+    """Return a class instance from a string reference"""
+    try:
+        module_ = importlib.import_module(module_name)
+        try:
+            class_ = getattr(module_, class_name)(**class_kwargs)
+        except AttributeError:
+            logging.error('Class does not exist')
+    except ImportError:
+        logging.error('Module does not exist')
+    return class_ or None
+
+
+def load_model(model_path, device):
     """
     Load model from path
     """
     logger.info("Loading model: {} ...".format(model_path))
     checkpoint = torch.load(model_path, map_location=device)
+
+    # dynamically instantiate the Xvector9s model
+    model = str_to_class('xvectors.xvector_model',
+                         checkpoint['arch'],
+                         checkpoint['model_constructor_args'])
+
     load_keys = []
     try:
         for name, value in model.plda.named_parameters():
@@ -109,6 +136,7 @@ def load_model(model_path, model, device):
         logger.info(" Didn't find loaded keys: '{}'".format(key_list))
 
     return model
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -156,6 +184,7 @@ def bn_momentum_adjust(model, optimizer):
             else:
                 break
 
+
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
     with torch.no_grad():
@@ -171,6 +200,7 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
+
 
 class NoamLR(torch.optim.lr_scheduler._LRScheduler): 
     """

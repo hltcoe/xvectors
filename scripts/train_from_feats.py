@@ -245,49 +245,7 @@ def main():
     parser.add_argument('--ResNet', action='store_true', default=False,
                         help='ResNet instead of TDNN (default False)')
 
-    # TODO: if we like the config file, you need to decide on one input interface, and perhaps
-    #  provide a converter rather than overwriting the args
-    parser.add_argument('--config', type=str, default=None,
-                        help='Config file, which either adds to configurations or overrides if'
-                             'they are set by flags')
-   
     args = parser.parse_args()
-
-    if args.config is not None:
-        logger.warning("Overwriting some command line configurations with values specified in:" + args.config)
-        with open(args.config, 'r') as f:
-            cfg_override = json.load(f)
-        if 'input_dim' in cfg_override:
-            args.feature_dim = cfg_override['input_dim']
-        if 'layer_dim' in cfg_override:
-            args.layer_dim = cfg_override['layer_dim']
-        if 'embedding_dim' in cfg_override:
-            args.embedding_dim = cfg_override['embedding_dim']
-        if 'LL' in cfg_override:
-            args.LLtype = cfg_override['LL']
-        if 'length_norm' in cfg_override:
-            args.length_norm = cfg_override['length_norm']
-        if 'resnet_flag' in cfg_override:
-            args.ResNet = cfg_override['resnet_flag']
-        if 'embed_relu_flag' in cfg_override:
-            args.embed_relu_flag = cfg_override['embed_relu_flag']
-        if 'feats_scp_filename' in cfg_override:
-            args.feats_scp_filename = cfg_override['feats_scp_filename']
-        if 'utt2spk_filename' in cfg_override:
-            args.utt2spk_filename = cfg_override['utt2spk_filename']
-        if 'train_portion' in cfg_override:
-            args.train_portion = cfg_override['train_portion']
-        if 'N0' in cfg_override:
-            args.enroll_N0 = cfg_override['N0']
-        if 'r' in cfg_override:
-            args.enroll_R = cfg_override['r']
-        if 'enroll_type' in cfg_override:
-            args.enroll_type = cfg_override['enroll_type']
-        # NOTE: the following configurations are unused when constructing the XVector9s model ...
-        #      1 - bn_momentum
-        #      2 - log_norm
-        #      3 - conf_flag
-
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     logger.info("Use CUDA: %s", use_cuda)
@@ -351,15 +309,20 @@ def main():
                                                   shuffle=False, sampler=SpkrSampler(test_dataset,reset_flag=True,fixed_N=args.fixed_N), **kwargs)
 
     logger.info("Creating model")
-    model = Xvector9s(input_dim=args.feature_dim,
-                      layer_dim=args.layer_dim,
-                      embedding_dim=args.embedding_dim,
-                      num_classes=len(train_dataset.spks),
-                      LL=args.LLtype,
-                      N0=args.enroll_N0,
-                      fixed_N=args.fixed_N,
-                      r=args.enroll_R, enroll_type=args.enroll_type,
-                      length_norm=args.length_norm, resnet_flag=args.ResNet)
+    model_constructor_args = {
+        'input_dim': args.feature_dim,
+        'layer_dim': args.layer_dim,
+        'embedding_dim': args.embedding_dim,
+        'num_classes': len(train_dataset.spks),
+        'LL': args.LLtype,
+        'N0': args.enroll_N0,
+        'fixed_N': args.fixed_N,
+        'r': args.enroll_R,
+        'enroll_type': args.enroll_type,
+        'length_norm': args.length_norm,
+        'resnet_flag': args.ResNet
+    }
+    model = Xvector9s(**model_constructor_args)
 
     model = model.to(device)
     logger.info("Model summary")
@@ -404,7 +367,7 @@ def main():
             init_optimizer = optimizer
 
     if args.load_model:
-        model = load_model(args.load_model, model, device)
+        model = load_model(args.load_model, device)
         if 0:
             logger.info("Freezing embedding layers of initial model...")
             model.freeze_embedding()
@@ -439,7 +402,7 @@ def main():
     if args.resume_checkpoint:
         start_epoch, model, optimizer, scheduler = resume_checkpoint(args.resume_checkpoint, model, optimizer, scheduler, device)
 
-
+    # TODO: ask Alan about this
     if 0 and args.load_model and model.plda.counts.min() < 10:
         logger.info("PLDA not found, generating it...")
         train_plda(args, model, device, train_loader)
@@ -472,10 +435,10 @@ def main():
             if init_scheduler is not None:
                 init_scheduler.step()
                 # save checkpoint
-                save_checkpoint(model, init_optimizer, init_scheduler, epoch, args.checkpoint_dir)
+                save_checkpoint(model, model_constructor_args, init_optimizer, init_scheduler, epoch, args.checkpoint_dir)
             else:
                 # save checkpoint
-                save_checkpoint(model, init_optimizer, scheduler, epoch, args.checkpoint_dir)
+                save_checkpoint(model, model_constructor_args, init_optimizer, scheduler, epoch, args.checkpoint_dir)
         
         start_epoch = args.init_epochs+1
 
@@ -515,7 +478,8 @@ def main():
             logger.info("New best validation loss.")
 
         # save checkpoint
-        save_checkpoint(model, optimizer, scheduler, epoch, args.checkpoint_dir, best_flag)
+        save_checkpoint(model, model_constructor_args, optimizer, scheduler, epoch, args.checkpoint_dir, best_flag)
+
 
 if __name__ == '__main__':
     main()
