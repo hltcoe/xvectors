@@ -11,11 +11,12 @@ from xvectors.utils import accuracy
 
 logger = logging.getLogger(__name__)
 
+
 # length-norm and PLDA layer
-class plda(nn.Module):
+class PLDA(nn.Module):
     def __init__(self, embedding_dim, num_classes, length_norm=True, update_scale=True, update_plda=True, N0=30, center_l=1e-4, discr_ac=False, log_norm=True):
 
-        super(plda, self).__init__()
+        super(PLDA, self).__init__()
 
         self.N0 = N0     # running sum size for model mean updates in PLDA
         self.length_norm_flag = length_norm
@@ -163,7 +164,8 @@ class plda(nn.Module):
                                         
                 self.d_ac.data = torch.diag(torch.mm(torch.mm(torch.t(self.Ulda),cov_ac),self.Ulda))
                 self.d_ac.data = torch.clamp(self.d_ac,min=0.0)
- 
+
+
 # Function to update running sums and counts for classes
 def update_counts(x1, labels1, sums1, counts1, N0, rand_flag=False):
 
@@ -201,6 +203,7 @@ def update_counts(x1, labels1, sums1, counts1, N0, rand_flag=False):
     # Return to device
     sums1, counts1 = sums1.to(device), counts1.to(device)
     return sums1, counts1
+
 
 class GaussLinear(nn.Module):
     def __init__(self, embedding_dim, num_classes, N0=9, fixed_N=True, discr_mean=False):
@@ -244,7 +247,8 @@ class GaussLinear(nn.Module):
         means = self.sums / self.counts[:,None]
         loss = torch.mean((self.means-means)**2)
         return loss
-        
+
+
 class GaussQuadratic(nn.Module):
     def __init__(self, embedding_dim, num_classes, N0=9, fixed_N=True, r=0.9, enroll_type='Bayes', N_dict={}, OOS=True):
         super(GaussQuadratic, self).__init__()
@@ -299,32 +303,32 @@ class GaussQuadratic(nn.Module):
 
 # Wrapper function for normalized cross entropy loss and accuracy
 #  can do outer layer or gaussian minibatch means
-def ComputeLoss(x, y, output, w, labels, loss_type='CE', model=None, boost=0):
+def compute_loss(x, y, output, w, labels, loss_type='CE', model=None, boost=0):
 
     if loss_type == 'CE':
-        loss, nloss = NCE_loss(output, labels, boost=boost)
+        loss, nloss = nce_loss(output, labels, boost=boost)
         acc = accuracy(output, labels)
     elif loss_type == 'BCE':
         # binary cross-entropy
-        loss, nloss = BCE_loss(output, labels)
+        loss, nloss = bce_loss(output, labels)
         if 1:
-            loss2, nloss2 = NCE_loss(output, labels, boost=boost)
+            loss2, nloss2 = nce_loss(output, labels, boost=boost)
             l = 0.1
             nloss = l*nloss + (1-l)*nloss2
             loss = nloss
         acc = accuracy(output, labels)
     elif loss_type == 'GaussLoss':
-        loss, nloss, acc = GaussLoss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
+        loss, nloss, acc = gauss_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.PLDA.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
     elif loss_type == 'BinLoss':
-        loss, nloss, acc = BinLoss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
+        loss, nloss, acc = bin_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.PLDA.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
     else:
         raise ValueError("Invalid loss type %s." % loss_type)
 
     if 0 and model is not None:
         # add in penalty on centers
         Cl = 1e-2
-        loss += Cl*model.plda.center_loss(x)
-        loss += Cl*model.plda.norm_loss(x)
+        loss += Cl*model.PLDA.center_loss(x)
+        loss += Cl*model.PLDA.norm_loss(x)
 
         if model.output.discr_mean:
             # penalty on means vs. ML
@@ -332,8 +336,9 @@ def ComputeLoss(x, y, output, w, labels, loss_type='CE', model=None, boost=0):
 
     return loss, nloss, acc
 
+
 # Normalized multiclass cross-entropy
-def NCE_loss(LL, labels, prior=None, boost=0):
+def nce_loss(LL, labels, prior=None, boost=0):
 
     M = LL.shape[1]
     if prior is None:
@@ -358,8 +363,9 @@ def NCE_loss(LL, labels, prior=None, boost=0):
         nloss = loss
     return loss, nloss
 
+
 # Binary cross-entropy, round-robin T/NT scoring
-def BCE_loss(LLR, labels, Pt=None):
+def bce_loss(LLR, labels, Pt=None):
 
     N = LLR.shape[0]
     M = LLR.shape[1]
@@ -388,10 +394,11 @@ def BCE_loss(LLR, labels, Pt=None):
 
     return nloss, nloss
 
+
 # Gaussian diarization loss in minibatch
 # Compute Gaussian cost across minibatch of samples vs. average
 # Note: w is ignored in this version
-def GaussMinibatchLL(x1, w, labels, loo_flag=True, cov_wc1=None, cov_ac1=None, enroll_type='Bayes', r=0.9, N_dict=None, binary=False):
+def gauss_minibatch_ll(x1, w, labels, loo_flag=True, cov_wc1=None, cov_ac1=None, enroll_type='Bayes', r=0.9, N_dict=None, binary=False):
 
     x = x1.cpu()  
     N = x.shape[0]
@@ -443,23 +450,26 @@ def GaussMinibatchLL(x1, w, labels, loo_flag=True, cov_wc1=None, cov_ac1=None, e
 
     return LL, prior, l2
 
+
 # Gaussian diarization loss in minibatch
-def GaussLoss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9, N_dict=None):
+def gauss_loss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9, N_dict=None):
 
     # Return normalized cross entropy cost
-    LL, prior, l2 = GaussMinibatchLL(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r, N_dict)
-    loss, nloss = NCE_loss(LL, l2, prior)
+    LL, prior, l2 = gauss_minibatch_ll(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r, N_dict)
+    loss, nloss = nce_loss(LL, l2, prior)
     acc = accuracy(LL,l2)
     return loss, nloss, acc
+
 
 # Binary T/NT diarization loss in minibatch
-def BinLoss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9, N_dict=None):
+def bin_loss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9, N_dict=None):
 
     # Return normalized cross entropy cost
-    LL, prior, l2 = GaussMinibatchLL(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r, N_dict, binary=True)
-    loss, nloss = BCE_loss(LL, l2)
+    LL, prior, l2 = gauss_minibatch_ll(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r, N_dict, binary=True)
+    loss, nloss = bce_loss(LL, l2)
     acc = accuracy(LL,l2)
     return loss, nloss, acc
+
 
 # Function for Bayesian adaptation of Gaussian model
 # Enroll type can be ML, MAP, or Bayes
@@ -494,6 +504,7 @@ def gmm_adapt(cnt, xsum, cov_wc, cov_ac, r=0, enroll_type='ML', N_dict=None):
     # Return
     return mu_model, cov_model
 
+
 def compute_Nsc(cnts, r, N_dict=None):
 
     # Correlation model for enrollment cuts (0=none,1=single-cut)
@@ -516,6 +527,7 @@ def compute_Nsc(cnts, r, N_dict=None):
         Nsc[mask] = N_dict[cnt]
 
     return Nsc
+
 
 def gmm_score(X, means, covars):
     """Compute Gaussian log-density at X for a diagonal model"""

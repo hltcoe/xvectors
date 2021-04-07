@@ -17,10 +17,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from xvectors.summary import summary
-from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, SpkrSplit
+from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, spkr_split
 from xvectors.xvector_model import Xvector9s, train_with_freeze
-from xvectors.plda_lib import ComputeLoss
-from xvectors.utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, linear_up_downLR
+from xvectors.plda_lib import compute_loss
+from xvectors.utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, LinearUpDownLR
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ def train(args, model, device, train_loader, optimizer, epoch, cost='CE', boost=
 
         # compute output and loss
         x, y, z, output, w = model(data, target)
-        loss, nloss, acc = ComputeLoss(x, z, output, w, target, cost, model, boost)
+        loss, nloss, acc = compute_loss(x, z, output, w, target, cost, model, boost)
         losses.update(nloss.item(), data.size(0))
         top1.update(acc[0][0], data.size(0))
         if w is not None:
@@ -117,7 +117,7 @@ def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
 
             # compute model output and loss
             x, y, z, output, w = model(data, embedding_only=embedding_only)
-            loss, nloss, acc = ComputeLoss(x, z, output, w, target, cost, model)
+            loss, nloss, acc = compute_loss(x, z, output, w, target, cost, model)
             losses.update(nloss.item(), data.size(0))
             top1.update(acc[0][0], data.size(0))
 
@@ -154,9 +154,9 @@ def train_plda(args, model, device, train_loader):
 
             # compute model output and update PLDA
             x, y, z, output, w = model(data, embedding_only=True)
-            model.plda.update_plda(y, target)
+            model.PLDA.update_plda(y, target)
 
-    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.plda.counts.min(),model.plda.counts.max()))
+    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.PLDA.counts.min(), model.PLDA.counts.max()))
 
 
 def main():
@@ -275,7 +275,7 @@ def main():
         test_cost = 'BinLoss'
     if args.train_portion < 1.0:
         logger.info("Creating test dataset using random speaker split (train: %f)" % (args.train_portion))
-        train_dataset, test_dataset = SpkrSplit(train_dataset, args.train_portion)
+        train_dataset, test_dataset = spkr_split(train_dataset, args.train_portion)
         if test_cost == 'BinLoss':
             test_dataset.set_Bin_cost()
         else:
@@ -380,7 +380,7 @@ def main():
     if args.init_up:
         N0 = args.init_up
         logger.info("Creating linear up/down learning rate scheduler, up %d then decay to %d", N0, args.epochs)
-        scheduler = linear_up_downLR(optimizer, N0, args.epochs)
+        scheduler = LinearUpDownLR(optimizer, N0, args.epochs)
     elif args.step_size == 0:
         logger.info("Creating validation error step learning rate scheduler, dropping by %f", args.step_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=args.step_decay, patience=10, verbose=True)

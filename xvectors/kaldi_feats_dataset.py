@@ -207,7 +207,8 @@ class SpkrSampler(Sampler):
     def __len__(self):
         return len(self.data_source)
 
-def SpkrSplit(trainset, train_split):
+
+def spkr_split(trainset, train_split):
 
     # Randomly split speakers of a training set for testing
     M = len(trainset.spks)
@@ -222,6 +223,7 @@ def SpkrSplit(trainset, train_split):
     trainset.speaker_select(trainset.spks[0:M1])
 
     return trainset, testset
+
 
 def read_mat_head(file_or_fd):
     """ [mat] = read_mat_head(file_or_fd)

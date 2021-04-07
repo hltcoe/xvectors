@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from xvectors.plda_lib import plda, GaussLinear, GaussQuadratic
-from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSplit
+from xvectors.plda_lib import PLDA, GaussLinear, GaussQuadratic
+from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, spkr_split
 
 import json
 
@@ -193,7 +193,7 @@ class Xvector9s(nn.Module):
         self.embed = nn.DataParallel(self.embed)
 
         # length-norm and PLDA layer
-        self.plda = plda(embedding_dim, num_classes, length_norm, update_scale, update_plda, log_norm=log_norm)
+        self.plda = PLDA(embedding_dim, num_classes, length_norm, update_scale, update_plda, log_norm=log_norm)
 
         # output 
         if self.LL == 'None':
