@@ -88,6 +88,7 @@ def train(args, model, device, train_loader, optimizer, epoch, cost='CE', boost=
            epoch,  batch_time=batch_time,
               loss=losses, top1=top1, lr=lr))
 
+
 def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
     """
     Evaluate model on validation data
@@ -133,6 +134,7 @@ def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
            loss=losses, top1=top1))
 
     return losses.avg
+
 
 def train_plda(args, model, device, train_loader):
     """

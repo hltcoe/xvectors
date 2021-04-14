@@ -152,9 +152,9 @@ def train_plda(args, model, device, train_loader):
 
             # compute model output and update PLDA
             x, y, z, output, w = model(data, embedding_only=True)
-            model.plda.update_plda(y, target)
+            model.PLDA.update_plda(y, target)
 
-    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.plda.counts.min(),model.plda.counts.max()))
+    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.PLDA.counts.min(), model.PLDA.counts.max()))
 
 
 def main():

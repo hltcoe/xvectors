@@ -73,11 +73,11 @@ def train(args, model, device, train_loader, optimizer, epoch, loss_fn):
                    epoch, step, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, top1=top1))
            with torch.no_grad():
-               print("center loss ", model.plda.center_loss(x))
-               print("norm loss ", model.plda.norm_loss(x))
+               print("center loss ", model.PLDA.center_loss(x))
+               print("norm loss ", model.PLDA.norm_loss(x))
                #print("mean loss ", model.output.mean_loss())
-               print("Norm scale ", model.plda.norm_scale)
-               print("d_ac ", model.plda.d_ac)
+               print("Norm scale ", model.PLDA.norm_scale)
+               print("d_ac ", model.PLDA.d_ac)
 
     # print epoch training loss
     logger.info('Train Epoch: [{0}]\t'
@@ -148,9 +148,9 @@ def train_plda(args, model, device, train_loader):
 
             # compute model output and update PLDA
             x, y, z, w = model(data)
-            model.plda.update_plda(y, target)
+            model.PLDA.update_plda(y, target)
 
-    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.plda.counts.min(),model.plda.counts.max()))
+    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.PLDA.counts.min(), model.PLDA.counts.max()))
 
 
 def main():

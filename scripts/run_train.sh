@@ -6,18 +6,13 @@ export CUDA_VISIBLE_DEVICES=$gpus
 module load cuda11.0/toolkit/11.0.3
 #
 source deactivate
-#conda info --envs
-source activate xvec
+source activate xvec  # NOTE: rename to the environment in which the `xvectors` package was installed
 
 #
 env | sort
 nvidia-smi
 ulimit -a
 #
-
-# Point to source code
-CODEBASE="/home/hltcoe/kkarra/speech/xvectors/"
-#CODEBASE="/home/hltcoe/amccree/src/pytorch-xvec/Releases/ver1_12"
 
 # Directories
 FEATS='feats_preprocess'
@@ -42,10 +37,6 @@ if [ -f "$LOCAL_DIR/$FEATS.ark" ]; then
 fi
 
 # Options
-# TODO: should you detect if the model config exists first, and if so, load that?
-MODEL_CFG=$HOME/speech/xvectors/cfgs/v10_gauss_lnorm_adam_768_128_postvox_sgd.json
-cp $MODEL_CFG $MODEL_DIR
-
 #MODEL_OPTS=" --feature-dim=23 --embedding-dim=256 --layer-dim=256 --length_norm "
 #MODEL_OPTS=" --feature-dim=64 --embedding-dim=256 --layer-dim=512 --length_norm "
 MODEL_OPTS=" --feature-dim=64 --embedding-dim=512 --layer-dim=512 --length_norm "
@@ -70,46 +61,47 @@ OPTIM_OPTS=" --optimizer=adam --learning-rate=0.002 --epochs=400 --init_epochs=4
 # Look for initial model for refinement
 INIT_MOD=$(/bin/ls -t $MODEL_DIR/model_init.pth)
 if [ ! -z "$INIT_MOD" ]; then
-    echo "Initial model $INIT_MOD found, refinement training only."
-    INIT_OPTS="--load_model=$INIT_MOD --freeze_prepool"
-    #INIT_OPTS="--load_model=$INIT_MOD "
-    OPTIM_OPTS=" --optimizer=adam --learning-rate=0.0000625 --epochs=200 --step-size=2000 --step-decay=1 --weight-decay=1e-5 "
+  echo "Initial model $INIT_MOD found, refinement training only."
+  INIT_OPTS="--load_model=$INIT_MOD --freeze_prepool"
+  #INIT_OPTS="--load_model=$INIT_MOD "
+  OPTIM_OPTS=" --optimizer=adam --learning-rate=0.0000625 --epochs=200 --step-size=2000 --step-decay=1 --weight-decay=1e-5 "
 fi
 
 # Look for best model or latest checkpoint
 BEST_MOD=$(/bin/ls -t $MODEL_DIR/best-model.pth)
 if [ ! -z "$BEST_MOD" ]; then
-    echo "Best model $BEST_MOD found, resuming from there."
-    INIT_OPTS="--resume-checkpoint=$BEST_MOD"
+  echo "Best model $BEST_MOD found, resuming from there."
+  INIT_OPTS="--resume-checkpoint=$BEST_MOD"
 else
-    # Look for latest checkpoint
-    CHKPT=$(/bin/ls -t $MODEL_DIR/ch*.pth | head -1)
-    if [ ! -z "$CHKPT" ]; then
-	echo "Latest checkpoint $CHKPT found, resuming from there."
-	INIT_OPTS="--resume-checkpoint=$CHKPT"
-    fi
+  # Look for latest checkpoint
+  CHKPT=$(/bin/ls -t $MODEL_DIR/ch*.pth | head -1)
+  if [ ! -z "$CHKPT" ]; then
+    echo "Latest checkpoint $CHKPT found, resuming from there."
+    INIT_OPTS="--resume-checkpoint=$CHKPT"
+  fi
 fi
 
 # Copy training feats to tmpdir if available
 if [ $DATA_COPY -eq 1 -a -n "$TMPDIR" ]; then
-    dfree=`df -k --output=avail $TMPDIR |tail -1`
-    fsize=`du -k $TRAIN_DIR/$FEATS.ark |cut -f 1`
-    echo "$TMPDIR free $dfree size needed is $fsize"
-    if [ $dfree -lt $((2*$fsize)) ]; then
-	echo "Not enough space on $TMPDIR to copy files from $TRAIN_DIR."
-    else
-	echo "Copying files to $TMPDIR from $TRAIN_DIR..."
-	cp $TRAIN_DIR/utt2spk $TMPDIR
-	cp $TRAIN_DIR/$FEATS.scp $TMPDIR
-	/home/hltcoe/amccree/bin/search_replace.py $TRAIN_DIR $TMPDIR $TMPDIR/$FEATS.scp $TMPDIR/$FEATS.scp
-	echo "Copying archive to $TMPDIR from $TRAIN_DIR..."
-	cp $TRAIN_DIR/$FEATS.ark $TMPDIR
-	echo "Done."
-	TRAIN_DIR=$TMPDIR
-    fi
+  dfree=`df -k --output=avail $TMPDIR |tail -1`
+  fsize=`du -k $TRAIN_DIR/$FEATS.ark |cut -f 1`
+  echo "$TMPDIR free $dfree size needed is $fsize"
+  if [ $dfree -lt $((2*$fsize)) ]; then
+    echo "Not enough space on $TMPDIR to copy files from $TRAIN_DIR."
+  else
+    echo "Copying files to $TMPDIR from $TRAIN_DIR..."
+    cp $TRAIN_DIR/utt2spk $TMPDIR
+    cp $TRAIN_DIR/$FEATS.scp $TMPDIR
+    /home/hltcoe/amccree/bin/search_replace.py $TRAIN_DIR $TMPDIR $TMPDIR/$FEATS.scp $TMPDIR/$FEATS.scp
+    echo "Copying archive to $TMPDIR from $TRAIN_DIR..."
+    cp $TRAIN_DIR/$FEATS.ark $TMPDIR
+    echo "Done."
+    TRAIN_DIR=$TMPDIR
+  fi
 fi
 
-$CODEBASE/scripts/train_from_feats.py $MODEL_OPTS $FRAME_OPTS $TRAIN_OPTS $ENROLL_OPTS $VALID_OPTS $OPTIM_OPTS $INIT_OPTS \
+# train_from_feats.py was installed into the virtual environment
+python train_from_feats.py $MODEL_OPTS $FRAME_OPTS $TRAIN_OPTS $ENROLL_OPTS $VALID_OPTS $OPTIM_OPTS $INIT_OPTS \
     --num-workers=2 \
     --log-interval=1000 \
     --train-portion=0.9 \
