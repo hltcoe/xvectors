@@ -55,4 +55,4 @@ All data is also augmented with the MUSAN corpus.
 Snyder, David, et al. "X-vectors: Robust dnn embeddings for speaker recognition." 2018 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP). IEEE, 2018.
 
 ## Contact
-If you have any comments or questions, please contact <>
+If you have any comments or questions, please create a GitHub issue.
