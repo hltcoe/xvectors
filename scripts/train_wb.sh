@@ -19,6 +19,12 @@ FEATS='feats'
 TRAIN_DIR='/expscratch/amccree/data/pytorch/fbank_80'
 UTT2SPK='utt2spk'
 
+# make sure the files needed for training exist!
+if [[ ! -f $TRAIN_DIR/$FEATS.scp || ! -f $TRAIN_DIR/utt2spk ]]; then
+  echo "${TRAIN_DIR}/${FEATS}.scp or ${TRAIN_DIR}/utt2spk do not exist!"
+fi
+
+
 # Flag to copy data to scratch disk first (takes 20 min)
 DATA_COPY=0
 
@@ -69,10 +75,10 @@ fi
 
 # Copy training feats to tmpdir if available
 if [ $DATA_COPY -eq 1 -a -n "$TMPDIR" ]; then
-    dfree=`df -k --output=avail $TMPDIR |tail -1`
-    fsize=`du -k $TRAIN_DIR/$FEATS.ark |cut -f 1`
+    dfree=$(df -k --output=avail $TMPDIR |tail -1)
+    fsize=$(du -k $TRAIN_DIR/$FEATS.ark |cut -f 1)
     echo "$TMPDIR free $dfree size needed is $fsize"
-    if [ $dfree -lt $((2*$fsize)) ]; then
+    if [ "$dfree" -lt $((2*$fsize)) ]; then
 	echo "Not enough space on $TMPDIR to copy files from $TRAIN_DIR."
 	exit
     else
