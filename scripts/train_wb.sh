@@ -17,13 +17,11 @@ MODEL_DIR='./models'
 mkdir -p $MODEL_DIR
 FEATS='feats'
 TRAIN_DIR='/expscratch/amccree/data/pytorch/fbank_80'
-UTT2SPK='utt2spk'
 
 # make sure the files needed for training exist!
 if [[ ! -f $TRAIN_DIR/$FEATS.scp || ! -f $TRAIN_DIR/utt2spk ]]; then
   echo "${TRAIN_DIR}/${FEATS}.scp or ${TRAIN_DIR}/utt2spk do not exist!"
 fi
-
 
 # Flag to copy data to scratch disk first (takes 20 min)
 DATA_COPY=0
@@ -83,7 +81,7 @@ if [ $DATA_COPY -eq 1 -a -n "$TMPDIR" ]; then
 	exit
     else
 	echo "Copying files to $TMPDIR from $TRAIN_DIR..."
-	cp $TRAIN_DIR/$UTT2SPK $TMPDIR
+	cp $TRAIN_DIR/utt2spk $TMPDIR
 	cp $TRAIN_DIR/$FEATS.scp $TMPDIR
 	python search_replace.py $TRAIN_DIR $TMPDIR $TMPDIR/$FEATS.scp $TMPDIR/$FEATS.scp
 	echo "Copying archive to $TMPDIR from $TRAIN_DIR..."
@@ -93,9 +91,9 @@ if [ $DATA_COPY -eq 1 -a -n "$TMPDIR" ]; then
     fi
 fi
 
-python train_from_feats.py $MODEL_OPTS $FRAME_OPTS $TRAIN_OPTS $ENROLL_OPTS $VALID_OPTS $OPTIM_OPTS $INIT_OPTS \
+python train_from_feats.py "$MODEL_OPTS" "$FRAME_OPTS" "$TRAIN_OPTS" "$ENROLL_OPTS" "$VALID_OPTS" "$OPTIM_OPTS" "$INIT_OPTS" \
     --num-workers=8 \
     --log-interval=1000 \
     --train-portion=0.95 \
     --checkpoint-dir=$MODEL_DIR \
-    $TRAIN_DIR/$FEATS.scp $TRAIN_DIR/$UTT2SPK
+    "$TRAIN_DIR"/"$FEATS".scp "$TRAIN_DIR"/utt2spk
