@@ -20,19 +20,9 @@ def gen_embed(data, model):
 
     # generate embedding (x=raw, y=scaled length-norm, z=plda)
     embedding_only = True
-    dgr_flag = 0
     with torch.no_grad():
-        if dgr_flag:
-            if 0:
-                y = model.extract_embedding(torch.from_numpy(data).unsqueeze(0))
-            else:
-                y = model.extract_embedding(torch.from_numpy(data).unsqueeze(0).unsqueeze(1))
-                #output = model.extract_embedding(torch.from_numpy(chunk_feats).unsqueeze(0).unsqueeze(1).to(device)).cpu().numpy().squeeze()
-        else:
-            x, y, z, output, w = model(torch.from_numpy(data).unsqueeze(0), embedding_only)
-            #x, y, z, output, w = model(torch.from_numpy(data).unsqueeze(0))
+        x, y, z, output, w = model(torch.from_numpy(data).unsqueeze(0), embedding_only)
 
-    #return z.numpy().T
     return y.numpy().T
 
 
@@ -42,9 +32,4 @@ def get_plda(model_file):
     d_wc = model.PLDA.d_wc.numpy()
     d_ac = model.PLDA.d_ac.numpy()
     d_ac = np.maximum(d_ac,0.0)
-    if 0:
-        # keep normscale
-        sc = model.PLDA.norm_scale.numpy()
-        print("scale Ulda by %f" % sc)
-        Ulda /= sc
     return Ulda, d_wc, d_ac

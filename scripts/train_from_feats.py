@@ -4,23 +4,17 @@ import argparse
 import logging
 import random
 import time
-import os
-
-#import torch.multiprocessing
-#torch.multiprocessing.set_sharing_strategy('file_system')
-
-import json
 
 import torch
 import torch.nn
-import torch.nn.functional as F
 import torch.optim as optim
 
 from torchsummary import summary
 from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, spkr_split
 from xvectors.xvector_model import Xvector9s, train_with_freeze
 from xvectors.plda_lib import compute_loss
-from xvectors.utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, LinearUpDownLR
+from xvectors.utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, \
+    LinearUpDownLR
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +39,8 @@ def train(args, model, device, train_loader, optimizer, epoch, cost='CE', boost=
         if args.random_frame_size:
             # random segment truncation for batch
             frame_length = random.randint(args.min_frames, args.max_frames)
-            data = data[:,:,0:frame_length]
-                    
+            data = data[:, :, 0:frame_length]
+
         # copy data to GPU
         data, target = data.to(device), target.to(device)
 
@@ -68,25 +62,25 @@ def train(args, model, device, train_loader, optimizer, epoch, cost='CE', boost=
         end = time.time()
 
         if step % args.log_interval == 0:
-           logger.info('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t'
-                  'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t'
-                  'Normalized Loss {loss.val:.3f} ({loss.avg:.3f})\t'
-                  'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                   epoch, step, len(train_loader), batch_time=batch_time,
-                   data_time=data_time, loss=losses, top1=top1))
+            logger.info('Epoch: [{0}][{1}/{2}]\t'
+                        'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t'
+                        'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t'
+                        'Normalized Loss {loss.val:.3f} ({loss.avg:.3f})\t'
+                        'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                            epoch, step, len(train_loader), batch_time=batch_time,
+                            data_time=data_time, loss=losses, top1=top1))
 
     # print epoch training loss
     for i, param_group in enumerate(optimizer.param_groups):
         lr = float(param_group['lr'])
         break
     logger.info('Train Epoch: [{0}]\t'
-          'Time {batch_time.avg:.3f}s\t'
-          'Normalized Loss {loss.avg:.3f}\t'
-          'Prec@1 {top1.avg:.3f}\t'
-          'lr {lr:.6f}'.format(
-           epoch,  batch_time=batch_time,
-              loss=losses, top1=top1, lr=lr))
+                'Time {batch_time.avg:.3f}s\t'
+                'Normalized Loss {loss.avg:.3f}\t'
+                'Prec@1 {top1.avg:.3f}\t'
+                'lr {lr:.6f}'.format(
+                    epoch, batch_time=batch_time,
+                    loss=losses, top1=top1, lr=lr))
 
 
 def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
@@ -111,8 +105,8 @@ def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
             if args.random_frame_size:
                 # random segment truncation for batch
                 frame_length = random.randint(args.min_frames, args.max_frames)
-                data = data[:,:,0:frame_length]
-                    
+                data = data[:, :, 0:frame_length]
+
             # copy data to GPU
             data, target = data.to(device), target.to(device)
 
@@ -127,11 +121,11 @@ def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
             end = time.time()
 
     logger.info('Valid Epoch: [{0}]\t'
-          'Time {batch_time.avg:.3f}s\t'
-          'Norm {1} {loss.avg:.3f}\t'
-          'Prec@1 {top1.avg:.3f}'.format(
-           epoch, cost, batch_time=batch_time,
-           loss=losses, top1=top1))
+                'Time {batch_time.avg:.3f}s\t'
+                'Norm {1} {loss.avg:.3f}\t'
+                'Prec@1 {top1.avg:.3f}'.format(
+                    epoch, cost, batch_time=batch_time,
+                    loss=losses, top1=top1))
 
     return losses.avg
 
@@ -149,8 +143,8 @@ def train_plda(args, model, device, train_loader):
             if args.random_frame_size:
                 # random segment truncation for batch
                 frame_length = random.randint(args.min_frames, args.max_frames)
-                data = data[:,:,0:frame_length]
-                    
+                data = data[:, :, 0:frame_length]
+
             # copy data to GPU
             data, target = data.to(device), target.to(device)
 
@@ -163,7 +157,7 @@ def train_plda(args, model, device, train_loader):
 
 def main():
     logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
-    #logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
+    # logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
 
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch x-vectors')
@@ -209,17 +203,18 @@ def main():
     parser.add_argument('--num-workers', type=int, default=0, metavar='N',
                         help='num workers (default: 0)')
     parser.add_argument('--resume-checkpoint', dest='resume_checkpoint',
-                         default='', type=str, metavar='PATH',
-                         help='path to latest checkpoint (default: none)')
+                        default='', type=str, metavar='PATH',
+                        help='path to latest checkpoint (default: none)')
     parser.add_argument('--load_model', dest='load_model',
-                         default='', type=str, metavar='PATH',
-                         help='path to initial model (default: none)')
+                        default='', type=str, metavar='PATH',
+                        help='path to initial model (default: none)')
     parser.add_argument('--train-portion', type=float, default=0.9, metavar='N',
                         help='train portion for random split (default: 0.9)')
     parser.add_argument('--valid_only', action='store_true', default=False,
                         help='validation only')
     parser.add_argument('--LLtype', dest='LLtype', default='linear',
-                        choices=['linear', 'Gauss', 'Gauss_discr', 'xvec', 'None'], help='log-likelihood output layer (default: linear)')
+                        choices=['linear', 'Gauss', 'Gauss_discr', 'xvec', 'None'],
+                        help='log-likelihood output layer (default: linear)')
     parser.add_argument('--length_norm', action='store_true', default=False,
                         help='length normalize embeddings')
     parser.add_argument('--train_cost', default='CE', type=str,
@@ -236,13 +231,13 @@ def main():
                         help='freeze prepooling layers of initial model (default False)')
     parser.add_argument('--init_epochs', type=int, default=0, metavar='N',
                         help='number of epochs for initializer training (default: 0)')
-    parser.add_argument('--init_learning_rate', type=float, default=0, 
+    parser.add_argument('--init_learning_rate', type=float, default=0,
                         help='initializer learning rate (default: 0 implies normal learning rate)')
-    parser.add_argument('--plda_learn_scale', type=float, default=0.01, 
+    parser.add_argument('--plda_learn_scale', type=float, default=0.01,
                         help='scale factor for sgd plda learning rate (default: 0.01)')
     parser.add_argument('--init_up', type=int, default=0, metavar='N',
                         help='number of epochs for linear ramp up stepsize (default: 0)')
-    parser.add_argument('--train_boost', type=float, default=0, 
+    parser.add_argument('--train_boost', type=float, default=0,
                         help='training CE boost margin (default: 0)')
     parser.add_argument('--ResNet', action='store_true', default=False,
                         help='ResNet instead of TDNN (default False)')
@@ -286,29 +281,33 @@ def main():
     valid_dataset = None
     if args.valid_feats_scp and args.valid_utt2spk:
         logger.info("Creating valid dataset")
-        valid_dataset = KaldiFeatsDataset(args.valid_feats_scp, args.valid_utt2spk, num_frames=frame_length, spk2int=train_dataset.spk2int, cost=args.train_cost)
+        valid_dataset = KaldiFeatsDataset(args.valid_feats_scp, args.valid_utt2spk, num_frames=frame_length,
+                                          spk2int=train_dataset.spk2int, cost=args.train_cost)
 
     if use_cuda:
-        logger.info("Creating training data loaders with %d workers with minibatch %d", args.num_workers,args.batch_size)
+        logger.info("Creating training data loaders with %d workers with minibatch %d", args.num_workers,
+                    args.batch_size)
     else:
-        logger.info("Creating training data loader with minibatch %d",args.batch_size)
+        logger.info("Creating training data loader with minibatch %d", args.batch_size)
     kwargs = {'num_workers': args.num_workers, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=args.batch_size,
                                                shuffle=False, sampler=SpkrSampler(train_dataset), **kwargs)
-    batch_size=2
+    batch_size = 2
     valid_loader = None
     if valid_dataset is not None:
-        logger.info("Creating validation data loader with minibatch %d",batch_size)
+        logger.info("Creating validation data loader with minibatch %d", batch_size)
         valid_loader = torch.utils.data.DataLoader(valid_dataset,
                                                    batch_size=batch_size,
-                                                   shuffle=False, sampler=SpkrSampler(valid_dataset,reset_flag=True), **kwargs)
+                                                   shuffle=False, sampler=SpkrSampler(valid_dataset, reset_flag=True),
+                                                   **kwargs)
     test_loader = None
     if test_dataset is not None:
-        logger.info("Creating test data loader with minibatch %d",args.test_batch_size)
+        logger.info("Creating test data loader with minibatch %d", args.test_batch_size)
         test_loader = torch.utils.data.DataLoader(test_dataset,
                                                   batch_size=args.test_batch_size,
-                                                  shuffle=False, sampler=SpkrSampler(test_dataset,reset_flag=True,fixed_N=args.fixed_N), **kwargs)
+                                                  shuffle=False, sampler=SpkrSampler(test_dataset, reset_flag=True,
+                                                                                     fixed_N=args.fixed_N), **kwargs)
 
     logger.info("Creating model")
     model_constructor_args = {
@@ -331,21 +330,25 @@ def main():
     summary(model, (args.feature_dim, 10000), device=device)
 
     if args.optimizer == 'sgd':
-        logger.info("Creating optimizer %s with learning-rate %f, momentum %f, weight_decay %f", args.optimizer, args.learning_rate, args.momentum, args.weight_decay)
+        logger.info("Creating optimizer %s with learning-rate %f, momentum %f, weight_decay %f", args.optimizer,
+                    args.learning_rate, args.momentum, args.weight_decay)
 
         # Set learning rate for PLDA parameters (mainly scale factor) to be slower
         params_not_plda = [{'params': model.embed.parameters()}]
         if model.output is not None:
             params_not_plda.append({'params': model.output.parameters()})
-        model_par = params_not_plda + [{'params': model.plda.parameters(), 'lr': args.plda_learn_scale*args.learning_rate}]
+        model_par = params_not_plda + [
+            {'params': model.plda.parameters(), 'lr': args.plda_learn_scale * args.learning_rate}]
         optimizer = optim.SGD(model_par, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
         if args.init_epochs and args.init_learning_rate:
             logger.info("Creating initial optimizer %s with learning-rate %f", args.optimizer, args.init_learning_rate)
             params_not_plda = [{'params': model.embed.parameters()}]
             if model.output is not None:
                 params_not_plda.append({'params': model.output.parameters()})
-            model_par = params_not_plda + [{'params': model.plda.parameters(), 'lr': args.plda_learn_scale*args.init_learning_rate}]
-            init_optimizer = optim.SGD(model_par, lr=args.init_learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
+            model_par = params_not_plda + [
+                {'params': model.plda.parameters(), 'lr': args.plda_learn_scale * args.init_learning_rate}]
+            init_optimizer = optim.SGD(model_par, lr=args.init_learning_rate, momentum=args.momentum,
+                                       weight_decay=args.weight_decay)
         else:
             logger.info("Initial optimizer is regular one.")
             init_optimizer = optimizer
@@ -359,7 +362,8 @@ def main():
             logger.info("Stepsize for init group %f" % (lr))
 
     elif args.optimizer == 'adam':
-        logger.info("Creating optimizer %s with learning-rate %f, weight_decay %f", args.optimizer, args.learning_rate, args.weight_decay)
+        logger.info("Creating optimizer %s with learning-rate %f, weight_decay %f", args.optimizer, args.learning_rate,
+                    args.weight_decay)
         optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
         if args.init_epochs and args.init_learning_rate:
             logger.info("Creating initial optimizer %s with learning-rate %f", args.optimizer, args.init_learning_rate)
@@ -370,10 +374,7 @@ def main():
 
     if args.load_model:
         model = load_model(args.load_model, device)
-        if 0:
-            logger.info("Freezing embedding layers of initial model...")
-            model.freeze_embedding()
-        elif args.freeze_prepool:
+        if args.freeze_prepool:
             logger.info("Freezing prepooling layers of initial model...")
             model.freeze_prepooling()
 
@@ -387,7 +388,8 @@ def main():
         logger.info("Creating validation error step learning rate scheduler, dropping by %f", args.step_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=args.step_decay, patience=10, verbose=True)
     elif args.step_decay > 0:
-        logger.info("Creating step learning rate scheduler, dropping by %f every %d epochs", args.step_decay, args.step_size)
+        logger.info("Creating step learning rate scheduler, dropping by %f every %d epochs", args.step_decay,
+                    args.step_size)
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.step_decay)
     else:
         logger.info("Creating exponential learning rate scheduler, gamma of %f", -args.step_decay)
@@ -397,17 +399,13 @@ def main():
     if args.init_epochs and args.init_learning_rate:
         max_lr = args.learning_rate
         base_lr = args.init_learning_rate
-        gamma = (max_lr/base_lr)**(1.0/args.init_epochs)
+        gamma = (max_lr / base_lr) ** (1.0 / args.init_epochs)
         logger.info("Creating initial exponential learning rate increase scheduler, gamma of %f", gamma)
         init_scheduler = optim.lr_scheduler.ExponentialLR(init_optimizer, gamma)
 
     if args.resume_checkpoint:
-        start_epoch, model, optimizer, scheduler = resume_checkpoint(args.resume_checkpoint, model, optimizer, scheduler, device)
-
-    # TODO: ask Alan about this
-    if 0 and args.load_model and model.plda.counts.min() < 10:
-        logger.info("PLDA not found, generating it...")
-        train_plda(args, model, device, train_loader)
+        start_epoch, model, optimizer, scheduler = resume_checkpoint(args.resume_checkpoint, model, optimizer,
+                                                                     scheduler, device)
 
     # Validation only
     if args.valid_only:
@@ -419,14 +417,14 @@ def main():
             validate(args, model, device, valid_loader, epoch, args.train_cost)
         validate(args, model, device, test_loader, epoch, test_cost)
         exit(0)
- 
+
     # Initial training: no scheduler or validation
     if start_epoch <= args.init_epochs:
         if init_scheduler is None and start_epoch == 1:
-            model.loo_flag = False   # Cold start can't use leave-one-out
+            model.loo_flag = False  # Cold start can't use leave-one-out
             logger.info(" turning off leave-one-out for initialization")
         logger.info("Starting initializer training from epoch %d for %d epochs", start_epoch, args.init_epochs)
-        for epoch in range(start_epoch, args.init_epochs+1):
+        for epoch in range(start_epoch, args.init_epochs + 1):
             # train an epoch
             train(args, model, device, train_loader, init_optimizer, epoch, args.train_cost, args.train_boost)
             if not model.loo_flag:
@@ -437,12 +435,13 @@ def main():
             if init_scheduler is not None:
                 init_scheduler.step()
                 # save checkpoint
-                save_checkpoint(model, model_constructor_args, init_optimizer, init_scheduler, epoch, args.checkpoint_dir)
+                save_checkpoint(model, model_constructor_args, init_optimizer, init_scheduler, epoch,
+                                args.checkpoint_dir)
             else:
                 # save checkpoint
                 save_checkpoint(model, model_constructor_args, init_optimizer, scheduler, epoch, args.checkpoint_dir)
-        
-        start_epoch = args.init_epochs+1
+
+        start_epoch = args.init_epochs + 1
 
     # Training
     best_loss = None
@@ -469,15 +468,10 @@ def main():
             scheduler.step()
 
         # adjust batch-norm momemtum also
-        #bn_momentum_adjust(model, optimizer)
+        # bn_momentum_adjust(model, optimizer)
 
         # check best validation loss or reset training (disabled)
         best_flag = False
-        if 0:
-        #if (best_loss is None or loss < best_loss):
-            best_loss = loss
-            best_flag = True
-            logger.info("New best validation loss.")
 
         # save checkpoint
         save_checkpoint(model, model_constructor_args, optimizer, scheduler, epoch, args.checkpoint_dir, best_flag)
