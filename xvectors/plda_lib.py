@@ -11,6 +11,10 @@ from xvectors.utils import accuracy
 
 logger = logging.getLogger(__name__)
 
+PLDA_UPDATE_BRUTEFORCE = True
+INCREMENTAL_DIAG_UPDATE = False
+KEEP_ORTHOGONAL = False
+
 
 # length-norm and PLDA layer
 class PLDA(nn.Module):
@@ -84,12 +88,7 @@ class PLDA(nn.Module):
     def center_loss(self, x):
 
         m = x.mean(dim=0)
-        if 0:
-            l = self.center_l
-            m0 = self.center
-            loss = ((1-l)**2)*torch.sum(m0**2) + 2*(1-l)*l*torch.sum(m0*m) + (l**2)*torch.sum(m**2)
-        else:
-            loss = torch.mean(m**2)
+        loss = torch.mean(m**2)
         return loss
 
     def update_center(self, x):
@@ -115,18 +114,18 @@ class PLDA(nn.Module):
 
                 # Simultaneous diagonalization of wc and ac covariances
                 # Assume wc=I
-                if 1:
+                if PLDA_UPDATE_BRUTEFORCE:
                     # Brute force every time
                     eval, self.Ulda.data = torch.symeig(cov_ac, eigenvectors=True)
                 else:
                     # Try for continuity vs. previous eigendecomposition
-                    if 0:
+                    if INCREMENTAL_DIAG_UPDATE:
                         # Start with existing diagonalization and update
                         S = torch.mm(torch.mm(torch.t(self.Ulda),cov_ac),self.Ulda)
                         ev,U2 = torch.symeig(S, eigenvectors=True)
                         U = torch.mm(self.Ulda,U2)
                         # keep orthogonal
-                        if 0:
+                        if KEEP_ORTHOGONAL:
                             I = torch.eye(cov_ac.shape[0],device=cov_ac.device)
                             U2 = torch.mm(U, I + 0.5*(I-torch.mm(torch.t(U),U)))
                     else:
