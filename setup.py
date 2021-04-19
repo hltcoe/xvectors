@@ -36,6 +36,7 @@ setuptools.setup(
         'scipy==1.6.0',
         'numpy',
         'kaldi_io',  # note that this is different than the kaldi-io package!
+        'torchsummary'
     ],
 
     scripts=['scripts/train_from_feats.py',

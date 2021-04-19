@@ -16,7 +16,7 @@ import torch.nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from xvectors.summary import summary
+from torchsummary import summary
 from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, spkr_split
 from xvectors.xvector_model import Xvector9s, train_with_freeze
 from xvectors.plda_lib import compute_loss
@@ -328,7 +328,7 @@ def main():
 
     model = model.to(device)
     logger.info("Model summary")
-    summary(model, input_size=(args.feature_dim, 10000))
+    summary(model, (args.feature_dim, 10000), device=device)
 
     if args.optimizer == 'sgd':
         logger.info("Creating optimizer %s with learning-rate %f, momentum %f, weight_decay %f", args.optimizer, args.learning_rate, args.momentum, args.weight_decay)
