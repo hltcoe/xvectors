@@ -324,15 +324,15 @@ def ComputeLoss(x, y, output, w, labels, loss_type='CE', model=None):
         loss = NCE_loss(output, labels)
         acc = accuracy(output, labels)
     elif loss_type == 'GaussLoss':
-        loss, acc = GaussLoss(y, w, labels, cov_ac=model.plda.d_ac)
+        loss, acc = GaussLoss(y, w, labels, cov_ac=model.PLDA.d_ac)
     else:
         raise ValueError("Invalid loss type %s." % loss_type)
 
     if 0 and model is not None:
         # add in penalty on centers
         Cl = 1e-2
-        loss += Cl*model.plda.center_loss(x)
-        loss += Cl*model.plda.norm_loss(x)
+        loss += Cl*model.PLDA.center_loss(x)
+        loss += Cl*model.PLDA.norm_loss(x)
 
         if model.output.discr_mean:
             # penalty on means vs. ML

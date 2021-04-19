@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+import importlib
 import torch
 import logging
 import torch.nn
@@ -9,7 +10,7 @@ import torch.optim.lr_scheduler
 logger = logging.getLogger(__name__)
 
 
-def save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_dir, best_flag=False):
+def save_checkpoint(model, model_constructor_args, optimizer, scheduler, epoch, checkpoint_dir, best_flag=False):
     """
     Saving checkpoints
     :param epoch: current epoch number
@@ -24,8 +25,12 @@ def save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_dir, best_fla
     else:
         state_dict = model.state_dict()
 
+    # TODO: if you want to make this more general, save the module name
+    #  such that it can be imported dynamically
+    #  see: str_to_class below
     state = {
         'arch': arch,
+        'model_constructor_args': model_constructor_args,
         'epoch': epoch,
         'state_dict': state_dict,
         'optimizer': optimizer.state_dict(),
@@ -51,6 +56,7 @@ def save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_dir, best_fla
         torch.save(state, filename)
         logger.info("Saving best model: {} ...".format(filename))
 
+
 def resume_checkpoint(resume_path, model, optimizer, scheduler, device):
     """
     Resume from saved checkpoints
@@ -69,20 +75,41 @@ def resume_checkpoint(resume_path, model, optimizer, scheduler, device):
 
     return start_epoch, model, optimizer, scheduler
 
-def load_model(model_path, model, device):
+
+# Modified from: https://stackoverflow.com/a/24674853/1057098
+def str_to_class(module_name, class_name, class_kwargs={}):
+    """Return a class instance from a string reference"""
+    try:
+        module_ = importlib.import_module(module_name)
+        try:
+            class_ = getattr(module_, class_name)(**class_kwargs)
+        except AttributeError:
+            logging.error('Class does not exist')
+    except ImportError:
+        logging.error('Module does not exist')
+    return class_ or None
+
+
+def load_model(model_path, device):
     """
     Load model from path
     """
     logger.info("Loading model: {} ...".format(model_path))
     checkpoint = torch.load(model_path, map_location=device)
+
+    # dynamically instantiate the Xvector9s model
+    model = str_to_class('xvectors.xvector_model',
+                         checkpoint['arch'],
+                         checkpoint['model_constructor_args'])
+
     load_keys = []
     try:
         for name, value in model.plda.named_parameters():
-            load_keys.append('plda.'+name)
+            load_keys.append('plda.' + name)
         for name, value in model.embed.named_parameters():
-            load_keys.append('embed.'+name)
+            load_keys.append('embed.' + name)
         for name, value in model.embed.named_buffers():
-            load_keys.append('embed.'+name)
+            load_keys.append('embed.' + name)
     except:
         load_keys = checkpoint['state_dict'].keys()
     pretrained_dict = {k: v for k, v in checkpoint['state_dict'].items() if k in load_keys}
@@ -110,8 +137,10 @@ def load_model(model_path, model, device):
 
     return model
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
@@ -150,11 +179,12 @@ def bn_momentum_adjust(model, optimizer):
     # Check if it's too big and reset
     for m in model.modules():
         if isinstance(m, torch.nn.BatchNorm1d):
-            if m.momentum > bn_mom+(1e-8):
-                logger.info("Adjusting bn momentum %f to %f" % (m.momentum,bn_mom))
+            if m.momentum > bn_mom + (1e-8):
+                logger.info("Adjusting bn momentum %f to %f" % (m.momentum, bn_mom))
                 m.momentum = bn_mom
             else:
                 break
+
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
@@ -172,7 +202,8 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
-class NoamLR(torch.optim.lr_scheduler._LRScheduler): 
+
+class NoamLR(torch.optim.lr_scheduler._LRScheduler):
     """
     Implements the Noam Learning rate schedule. This corresponds to increasing the learning rate
     linearly for the first ``warmup_steps`` training steps, and decreasing it thereafter proportionally
@@ -184,6 +215,7 @@ class NoamLR(torch.optim.lr_scheduler._LRScheduler):
     warmup_steps: ``int``, required.
         The number of steps to linearly increase the learning rate.
     """
+
     def __init__(self, optimizer, warmup_steps):
         self.warmup_steps = warmup_steps
         super().__init__(optimizer)
@@ -193,7 +225,8 @@ class NoamLR(torch.optim.lr_scheduler._LRScheduler):
         scale = self.warmup_steps ** 0.5 * min(last_epoch ** (-0.5), last_epoch * self.warmup_steps ** (-1.5))
         return [base_lr * scale for base_lr in self.base_lrs]
 
-class linear_up_downLR(torch.optim.lr_scheduler._LRScheduler): 
+
+class LinearUpDownLR(torch.optim.lr_scheduler._LRScheduler):
     """
     Parameters
     ----------
@@ -202,6 +235,7 @@ class linear_up_downLR(torch.optim.lr_scheduler._LRScheduler):
     N: ``int``, required.
         The total number of steps.
     """
+
     def __init__(self, optimizer, N0, N, min_scale=(2e-3)):
         self.N0 = N0
         self.N = N
@@ -209,10 +243,10 @@ class linear_up_downLR(torch.optim.lr_scheduler._LRScheduler):
         super().__init__(optimizer)
 
     def get_lr(self):
-        n = self.last_epoch+1
+        n = self.last_epoch + 1
         if n <= self.N0:
             scale = n / self.N0
         else:
-            scale = (self.N-n)/(self.N-self.N0)
-        scale = min(max(scale, self.min_scale),1.0)
+            scale = (self.N - n) / (self.N - self.N0)
+        scale = min(max(scale, self.min_scale), 1.0)
         return [base_lr * scale for base_lr in self.base_lrs]

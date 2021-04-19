@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd.function import Function
-from utils import accuracy
+from xvectors.utils import accuracy
 """
 from sync_batchnorm import SynchronizedBatchNorm1d
 import torchvision.models as torch_models
@@ -3221,7 +3221,7 @@ def ComputeLoss(x, y, output, w, labels, loss_type='CE', model=None):
         loss, nloss, acc = prototypical_loss(output, labels)
 
     elif loss_type == 'GaussLoss':
-        loss, nloss, acc = GaussLoss(y, w, labels, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
+        loss, nloss, acc = GaussLoss(y, w, labels, cov_ac=model.PLDA.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
     else:
         raise ValueError("Invalid loss type %s." % loss_type)
 

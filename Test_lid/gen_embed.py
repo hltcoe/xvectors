@@ -119,7 +119,7 @@ def get_plda(model_file):
     d_ac = np.maximum(d_ac,0.0)
     if 0:
         # keep normscale
-        sc = model.plda.norm_scale.numpy()
+        sc = model.PLDA.norm_scale.numpy()
         print("scale Ulda by %f" % sc)
         Ulda /= sc
     return Ulda, d_wc, d_ac

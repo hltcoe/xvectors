@@ -5,7 +5,11 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from plda_lib import plda, GaussLinear, GaussQuadratic
+
+from xvectors.plda_lib import PLDA, GaussLinear, GaussQuadratic
+from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, spkr_split
+
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +151,14 @@ class Xvector_embed(nn.Module):
 
 class Xvector9s(nn.Module):
 
-    def __init__(self, input_dim, layer_dim, embedding_dim, num_classes, LL='linear', N0=9, fixed_N=True, length_norm=False, r=0.9, enroll_type='Bayes', loo_flag=True, bn_momentum=0.1, log_norm=True, conf_flag=False, resnet_flag=True, embed_relu_flag=False):
+    def __init__(self, input_dim, layer_dim, embedding_dim, num_classes, LL='linear', N0=9, fixed_N=True,
+                 length_norm=False, r=0.9, enroll_type='Bayes', loo_flag=True, bn_momentum=0.1, log_norm=True,
+                 conf_flag=False, resnet_flag=True, embed_relu_flag=False):
+        """
+        Notes:
+             1 - loo_flag should be a setter/getter, not in the constructor as it is set
+                 as training progresses
+        """
 
         super(Xvector9s, self).__init__()
         self.LL = LL
@@ -182,7 +193,7 @@ class Xvector9s(nn.Module):
         self.embed = nn.DataParallel(self.embed)
 
         # length-norm and PLDA layer
-        self.plda = plda(embedding_dim, num_classes, length_norm, update_scale, update_plda, log_norm=log_norm)
+        self.plda = PLDA(embedding_dim, num_classes, length_norm, update_scale, update_plda, log_norm=log_norm)
 
         # output 
         if self.LL == 'None':

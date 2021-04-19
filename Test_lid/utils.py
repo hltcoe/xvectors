@@ -77,7 +77,7 @@ def load_model(model_path, model, device):
     checkpoint = torch.load(model_path, map_location=device)
     load_keys = []
     try:
-        for name, value in model.plda.named_parameters():
+        for name, value in model.PLDA.named_parameters():
             load_keys.append('plda.'+name)
         for name, value in model.embed.named_parameters():
             load_keys.append('embed.'+name)

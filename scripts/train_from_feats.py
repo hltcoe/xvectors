@@ -9,16 +9,18 @@ import os
 #import torch.multiprocessing
 #torch.multiprocessing.set_sharing_strategy('file_system')
 
+import json
+
 import torch
 import torch.nn
 import torch.nn.functional as F
 import torch.optim as optim
-from summary import summary
 
-from kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, SpkrSplit
-from xvector_model import Xvector9s, train_with_freeze
-from plda_lib import ComputeLoss
-from utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, linear_up_downLR
+from xvectors.summary import summary
+from xvectors.kaldi_feats_dataset import KaldiFeatsDataset, SpkrSampler, spkr_split
+from xvectors.xvector_model import Xvector9s, train_with_freeze
+from xvectors.plda_lib import compute_loss
+from xvectors.utils import save_checkpoint, resume_checkpoint, AverageMeter, accuracy, load_model, bn_momentum_adjust, LinearUpDownLR
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ def train(args, model, device, train_loader, optimizer, epoch, cost='CE', boost=
 
         # compute output and loss
         x, y, z, output, w = model(data, target)
-        loss, nloss, acc = ComputeLoss(x, z, output, w, target, cost, model, boost)
+        loss, nloss, acc = compute_loss(x, z, output, w, target, cost, model, boost)
         losses.update(nloss.item(), data.size(0))
         top1.update(acc[0][0], data.size(0))
         if w is not None:
@@ -86,6 +88,7 @@ def train(args, model, device, train_loader, optimizer, epoch, cost='CE', boost=
            epoch,  batch_time=batch_time,
               loss=losses, top1=top1, lr=lr))
 
+
 def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
     """
     Evaluate model on validation data
@@ -115,7 +118,7 @@ def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
 
             # compute model output and loss
             x, y, z, output, w = model(data, embedding_only=embedding_only)
-            loss, nloss, acc = ComputeLoss(x, z, output, w, target, cost, model)
+            loss, nloss, acc = compute_loss(x, z, output, w, target, cost, model)
             losses.update(nloss.item(), data.size(0))
             top1.update(acc[0][0], data.size(0))
 
@@ -131,6 +134,7 @@ def validate(args, model, device, val_loader, epoch, cost='GaussLoss'):
            loss=losses, top1=top1))
 
     return losses.avg
+
 
 def train_plda(args, model, device, train_loader):
     """
@@ -152,9 +156,9 @@ def train_plda(args, model, device, train_loader):
 
             # compute model output and update PLDA
             x, y, z, output, w = model(data, embedding_only=True)
-            model.plda.update_plda(y, target)
+            model.PLDA.update_plda(y, target)
 
-    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.plda.counts.min(),model.plda.counts.max()))
+    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.PLDA.counts.min(), model.PLDA.counts.max()))
 
 
 def main():
@@ -242,7 +246,7 @@ def main():
                         help='training CE boost margin (default: 0)')
     parser.add_argument('--ResNet', action='store_true', default=False,
                         help='ResNet instead of TDNN (default False)')
-   
+
     args = parser.parse_args()
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -264,7 +268,8 @@ def main():
         # Constant average frame size
         frame_length = (args.max_frames + args.min_frames) // 2
         logger.info("Fixed frame length %d", frame_length)
-    train_dataset = KaldiFeatsDataset(args.feats_scp_filename, args.utt2spk_filename, num_frames=frame_length, cost=args.train_cost, enroll_N0=args.enroll_N0)
+    train_dataset = KaldiFeatsDataset(args.feats_scp_filename, args.utt2spk_filename,
+                                      num_frames=frame_length, cost=args.train_cost, enroll_N0=args.enroll_N0)
 
     test_dataset = None
     test_cost = 'GaussLoss'
@@ -272,7 +277,7 @@ def main():
         test_cost = 'BinLoss'
     if args.train_portion < 1.0:
         logger.info("Creating test dataset using random speaker split (train: %f)" % (args.train_portion))
-        train_dataset, test_dataset = SpkrSplit(train_dataset, args.train_portion)
+        train_dataset, test_dataset = spkr_split(train_dataset, args.train_portion)
         if test_cost == 'BinLoss':
             test_dataset.set_Bin_cost()
         else:
@@ -306,15 +311,20 @@ def main():
                                                   shuffle=False, sampler=SpkrSampler(test_dataset,reset_flag=True,fixed_N=args.fixed_N), **kwargs)
 
     logger.info("Creating model")
-    model = Xvector9s(input_dim=args.feature_dim,
-                      layer_dim=args.layer_dim,
-                      embedding_dim=args.embedding_dim,
-                      num_classes=len(train_dataset.spks),
-                      LL=args.LLtype,
-                      N0=args.enroll_N0,
-                      fixed_N=args.fixed_N,
-                      r=args.enroll_R, enroll_type=args.enroll_type,
-                      length_norm=args.length_norm, resnet_flag=args.ResNet)
+    model_constructor_args = {
+        'input_dim': args.feature_dim,
+        'layer_dim': args.layer_dim,
+        'embedding_dim': args.embedding_dim,
+        'num_classes': len(train_dataset.spks),
+        'LL': args.LLtype,
+        'N0': args.enroll_N0,
+        'fixed_N': args.fixed_N,
+        'r': args.enroll_R,
+        'enroll_type': args.enroll_type,
+        'length_norm': args.length_norm,
+        'resnet_flag': args.ResNet
+    }
+    model = Xvector9s(**model_constructor_args)
 
     model = model.to(device)
     logger.info("Model summary")
@@ -359,7 +369,7 @@ def main():
             init_optimizer = optimizer
 
     if args.load_model:
-        model = load_model(args.load_model, model, device)
+        model = load_model(args.load_model, device)
         if 0:
             logger.info("Freezing embedding layers of initial model...")
             model.freeze_embedding()
@@ -372,7 +382,7 @@ def main():
     if args.init_up:
         N0 = args.init_up
         logger.info("Creating linear up/down learning rate scheduler, up %d then decay to %d", N0, args.epochs)
-        scheduler = linear_up_downLR(optimizer, N0, args.epochs)
+        scheduler = LinearUpDownLR(optimizer, N0, args.epochs)
     elif args.step_size == 0:
         logger.info("Creating validation error step learning rate scheduler, dropping by %f", args.step_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=args.step_decay, patience=10, verbose=True)
@@ -394,7 +404,7 @@ def main():
     if args.resume_checkpoint:
         start_epoch, model, optimizer, scheduler = resume_checkpoint(args.resume_checkpoint, model, optimizer, scheduler, device)
 
-
+    # TODO: ask Alan about this
     if 0 and args.load_model and model.plda.counts.min() < 10:
         logger.info("PLDA not found, generating it...")
         train_plda(args, model, device, train_loader)
@@ -427,10 +437,10 @@ def main():
             if init_scheduler is not None:
                 init_scheduler.step()
                 # save checkpoint
-                save_checkpoint(model, init_optimizer, init_scheduler, epoch, args.checkpoint_dir)
+                save_checkpoint(model, model_constructor_args, init_optimizer, init_scheduler, epoch, args.checkpoint_dir)
             else:
                 # save checkpoint
-                save_checkpoint(model, init_optimizer, scheduler, epoch, args.checkpoint_dir)
+                save_checkpoint(model, model_constructor_args, init_optimizer, scheduler, epoch, args.checkpoint_dir)
         
         start_epoch = args.init_epochs+1
 
@@ -470,7 +480,8 @@ def main():
             logger.info("New best validation loss.")
 
         # save checkpoint
-        save_checkpoint(model, optimizer, scheduler, epoch, args.checkpoint_dir, best_flag)
+        save_checkpoint(model, model_constructor_args, optimizer, scheduler, epoch, args.checkpoint_dir, best_flag)
+
 
 if __name__ == '__main__':
     main()

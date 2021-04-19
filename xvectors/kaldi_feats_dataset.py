@@ -6,9 +6,7 @@ import copy
 import numpy as np
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
-
-from kaldi_io import read_mat, read_mat_head, read_mat_data
-
+import kaldi_io
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +207,8 @@ class SpkrSampler(Sampler):
     def __len__(self):
         return len(self.data_source)
 
-def SpkrSplit(trainset, train_split):
+
+def spkr_split(trainset, train_split):
 
     # Randomly split speakers of a training set for testing
     M = len(trainset.spks)
@@ -226,3 +225,86 @@ def SpkrSplit(trainset, train_split):
     return trainset, testset
 
 
+def read_mat_head(file_or_fd):
+    """ [mat] = read_mat_head(file_or_fd)
+     Reads single kaldi matrix header
+     file_or_fd : file, gzipped file, pipe or opened file descriptor.
+    """
+    fd = kaldi_io.open_or_fd(file_or_fd)
+
+    # Read binary, header, then dimensions
+    h_raw = fd.read(5)
+    binary = h_raw[0:2].decode()
+    header = h_raw[2:5].decode()
+    if not (binary == '\0B'):
+        raise kaldi_io.UnknownMatrixHeader("Non-binary kaldi filetype")
+    globmin = None
+    globrange = None
+    if header == 'FM ':
+        s1, rows, s2, cols = np.frombuffer(fd.read(10), dtype='int8,int32,int8,int32', count=1)[0]
+    elif header == 'CM ' or header == 'CMT':
+        # Read global header of format struct'
+        global_header = np.dtype(
+            [('minvalue', 'float32'), ('range', 'float32'), ('num_rows', 'int32'), ('num_cols', 'int32')])
+        globmin, globrange, rows, cols = np.frombuffer(fd.read(16), dtype=global_header, count=1)[0]
+    else:
+        raise kaldi_io.UnknownMatrixHeader("The header contained '%s'" % header)
+
+    return fd, rows, cols, header, globmin, globrange
+
+
+def read_mat_data(fd, rows, cols, filetype, start=0, globmin=None, globrange=None, N=0):
+    # Read selected rows and cols from data beginning at start
+    if filetype == 'FM ':
+        # Float
+        sample_size = 4  # floats
+
+        # Skip to start
+        if start:
+            fd.seek(int(start * cols * sample_size), 1)
+        buf = fd.read(rows * cols * sample_size)
+        vec = np.frombuffer(buf, dtype='float32')
+        mat = np.reshape(vec, (rows, cols))
+
+    else:
+        # Compressed format
+        per_col_header = np.dtype([('percentile_0', 'uint16'), ('percentile_25', 'uint16'), ('percentile_75', 'uint16'),
+                                   ('percentile_100', 'uint16')])
+        # The data is structed as [Colheader, ... , Colheader, Data, Data , .... ]
+        #                         {           cols           }{     size         }
+        col_headers = np.frombuffer(fd.read(cols * 8), dtype=per_col_header, count=cols)
+        col_headers = np.array(
+            [np.array([x for x in y]) * globrange * 1.52590218966964e-05 + globmin for y in col_headers],
+            dtype=np.float32)
+        if filetype == 'CMT':
+            # Read row-major matrix and transpose for later
+            fd.seek(int(start * cols), 1)
+            data = np.reshape(np.frombuffer(fd.read(rows * cols), dtype='uint8'), newshape=(rows, cols)).T
+        elif filetype == 'CM ':
+            # Read each dimension (col-major not row-major!)
+            data = np.zeros((cols, rows), dtype='uint8')
+            Nskip = start
+            for d in range(cols):
+                fd.seek(int(Nskip), 1)
+                data[d, :] = np.frombuffer(fd.read(rows), dtype='uint8', count=rows)
+                Nskip = N - rows
+        else:
+            raise kaldi_io.UnknownMatrixHeader("The filetype contained '%s'" % filetype)
+
+        mat = np.zeros((cols, rows), dtype='float32')
+        p0 = col_headers[:, 0].reshape(-1, 1)
+        p25 = col_headers[:, 1].reshape(-1, 1)
+        p75 = col_headers[:, 2].reshape(-1, 1)
+        p100 = col_headers[:, 3].reshape(-1, 1)
+        mask_0_64 = (data <= 64)
+        mask_193_255 = (data > 192)
+        mask_65_192 = (~(mask_0_64 | mask_193_255))
+
+        mat += (p0 + (p25 - p0) / 64. * data) * mask_0_64.astype(np.float32)
+        mat += (p25 + (p75 - p25) / 128. * (data - 64)) * mask_65_192.astype(np.float32)
+        mat += (p75 + (p100 - p75) / 63. * (data - 192)) * mask_193_255.astype(np.float32)
+
+        mat = mat.T  # transpose! col-major -> row-major,
+
+    fd.close()
+    return mat
