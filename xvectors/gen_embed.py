@@ -28,8 +28,8 @@ def gen_embed(data, model):
 
 def get_plda(model_file):
     model = load_embed_model(model_file)
-    Ulda = model.PLDA.Ulda.numpy()
-    d_wc = model.PLDA.d_wc.numpy()
-    d_ac = model.PLDA.d_ac.numpy()
+    Ulda = model.plda.Ulda.numpy()
+    d_wc = model.plda.d_wc.numpy()
+    d_ac = model.plda.d_ac.numpy()
     d_ac = np.maximum(d_ac,0.0)
     return Ulda, d_wc, d_ac
