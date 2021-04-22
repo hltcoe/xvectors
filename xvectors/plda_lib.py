@@ -317,17 +317,17 @@ def compute_loss(x, y, output, w, labels, loss_type='CE', model=None, boost=0):
             loss = nloss
         acc = accuracy(output, labels)
     elif loss_type == 'GaussLoss':
-        loss, nloss, acc = gauss_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.PLDA.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
+        loss, nloss, acc = gauss_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
     elif loss_type == 'BinLoss':
-        loss, nloss, acc = bin_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.PLDA.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
+        loss, nloss, acc = bin_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
     else:
         raise ValueError("Invalid loss type %s." % loss_type)
 
     if 0 and model is not None:
         # add in penalty on centers
         Cl = 1e-2
-        loss += Cl*model.PLDA.center_loss(x)
-        loss += Cl*model.PLDA.norm_loss(x)
+        loss += Cl*model.plda.center_loss(x)
+        loss += Cl*model.plda.norm_loss(x)
 
         if model.output.discr_mean:
             # penalty on means vs. ML

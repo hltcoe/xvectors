@@ -4,7 +4,7 @@ gpus=$(get_cuda_visible_devices.py --num-gpus 1)
 export CUDA_VISIBLE_DEVICES=$gpus
 #
 source deactivate
-conda activate speech # TODO: replace with your conda environment name
+conda activate xvec # TODO: replace with your conda environment name
 
 #
 env | sort
@@ -15,7 +15,8 @@ ulimit -a
 # Directories
 #FEATS='feats_preprocess'
 FEATS='feats_t'
-MODEL_DIR='./models'
+#MODEL_DIR='./models'
+MODEL_DIR="/expscratch/kkarra/xvec_retrain/nb_test"
 mkdir -p $MODEL_DIR
 TRAIN_DIR='/expscratch/amccree/data/pytorch/fbank_64/'
 
@@ -28,25 +29,25 @@ fi
 DATA_COPY=0
 
 # Options
-MODEL_OPTS=" --feature-dim=64 --embedding-dim=128 --layer-dim=768 --length_norm "
-FRAME_OPTS=" --random-frame-size --min-frames=200 --max-frames=200 "
+MODEL_OPTS="--feature-dim=64 --embedding-dim=128 --layer-dim=768 --length_norm"
+FRAME_OPTS="--random-frame-size --min-frames=200 --max-frames=200"
 
-TRAIN_OPTS=" --LLtype=Gauss --train_cost=CE --batch-size=512 "
+TRAIN_OPTS="--LLtype=Gauss --train_cost=CE --batch-size=512"
 
-ENROLL_OPTS=" --enroll_R=0.9 --enroll_type=Bayes "
+ENROLL_OPTS="--enroll_R=0.9 --enroll_type=Bayes"
 
 VALID_OPTS=""
 #VALID_OPTS=" --valid_only "  # NOTE: if this is set, only run validation of a trained model
 
-SCHEDULE_OPTS=" --epochs=600 --init_up 30 "
-OPTIM_OPTS=" --optimizer=sgd --momentum=0.9 --learning-rate=0.1 --weight-decay=1e-4 $SCHEDULE_OPTS"
+SCHEDULE_OPTS="--epochs=600 --init_up 30"
+OPTIM_OPTS="--optimizer=sgd --momentum=0.9 --learning-rate=0.1 --weight-decay=1e-4 $SCHEDULE_OPTS"
 
 # Look for initial model for refinement
 INIT_MOD=$(/bin/ls -t $MODEL_DIR/model_init.pth)
 if [ ! -z "$INIT_MOD" ]; then
   echo "Initial model $INIT_MOD found, refinement training only."
-  INIT_OPTS="--load_model=$INIT_MOD --freeze_prepool "
-  OPTIM_OPTS=" --optimizer=sgd --momentum=0.9 --learning-rate=0.01 --weight-decay=1e-4 --epochs=60 --init_up 3 "
+  INIT_OPTS="--load_model=$INIT_MOD --freeze_prepool"
+  OPTIM_OPTS="--optimizer=sgd --momentum=0.9 --learning-rate=0.01 --weight-decay=1e-4 --epochs=60 --init_up 3"
 fi
 
 # Look for best model or latest checkpoint
@@ -82,9 +83,11 @@ if [ $DATA_COPY -eq 1 -a -n "$TMPDIR" ]; then
   fi
 fi
 
-python train_from_feats.py "$MODEL_OPTS" "$FRAME_OPTS" "$TRAIN_OPTS" "$ENROLL_OPTS" "$VALID_OPTS" "$OPTIM_OPTS" "$INIT_OPTS" \
+set -x
+python train_from_feats.py \
+  ${MODEL_OPTS} ${FRAME_OPTS} ${TRAIN_OPTS} ${ENROLL_OPTS} ${VALID_OPTS} ${OPTIM_OPTS} ${INIT_OPTS} \
   --num-workers=8 \
   --log-interval=1000 \
   --train-portion=0.9 \
   --checkpoint-dir=$MODEL_DIR \
-  "$TRAIN_DIR"/"$FEATS".scp "$TRAIN_DIR"/utt2spk
+  ${TRAIN_DIR}/${FEATS}.scp ${TRAIN_DIR}/utt2spk

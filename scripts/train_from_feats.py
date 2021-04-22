@@ -252,7 +252,8 @@ def main():
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    device = torch.device("cuda" if use_cuda else "cpu")
+    device_str = 'cuda' if use_cuda else 'cpu'
+    device = torch.device(device_str)
 
     logger.info("Creating train dataset")
     if args.random_frame_size:
@@ -324,10 +325,10 @@ def main():
         'resnet_flag': args.ResNet
     }
     model = Xvector9s(**model_constructor_args)
-
+    
     model = model.to(device)
-    logger.info("Model summary")
-    summary(model, (args.feature_dim, 10000), device=device)
+    #logger.info("Model summary")
+    #summary(model, (args.feature_dim, 10000), device='cpu')
 
     if args.optimizer == 'sgd':
         logger.info("Creating optimizer %s with learning-rate %f, momentum %f, weight_decay %f", args.optimizer,
