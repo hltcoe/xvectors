@@ -164,7 +164,6 @@ class Xvector9s(nn.Module):
         self.LL = LL
         self.enroll_type = enroll_type
         self.r = r
-        self.N_dict = {}
         self.loo_flag = loo_flag
         self.prepooling_frozen = False
         self.embedding_frozen = False
@@ -204,7 +203,7 @@ class Xvector9s(nn.Module):
             if enroll_type == 'ML':
                 self.output = GaussLinear(embedding_dim, num_classes, N0, fixed_N)
             else:                
-                self.output = GaussQuadratic(embedding_dim, num_classes, N0, fixed_N, r, enroll_type, self.N_dict)
+                self.output = GaussQuadratic(embedding_dim, num_classes, N0, fixed_N, r, enroll_type)
 
         elif self.LL == 'Gauss_discr':
             # Gaussian discriminative means
@@ -257,6 +256,16 @@ class Xvector9s(nn.Module):
         if self.LL == 'Gauss':
             self.output.update_params(y, labels)
         return
+
+    def freeze_prepooling(self):
+
+        model = self.embed
+        if hasattr(model, 'module'):
+            model = model.module
+        freeze_prepooling(model)
+
+        return
+
 
 ### Resnet embedding functions
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
