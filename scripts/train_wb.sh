@@ -91,9 +91,10 @@ if [ $DATA_COPY -eq 1 -a -n "$TMPDIR" ]; then
     fi
 fi
 
-python train_from_feats.py "$MODEL_OPTS" "$FRAME_OPTS" "$TRAIN_OPTS" "$ENROLL_OPTS" "$VALID_OPTS" "$OPTIM_OPTS" "$INIT_OPTS" \
+python train_from_feats.py \
+    ${MODEL_OPTS} ${FRAME_OPTS} ${TRAIN_OPTS} ${ENROLL_OPTS} ${VALID_OPTS} ${OPTIM_OPTS} ${INIT_OPTS} \
     --num-workers=8 \
     --log-interval=1000 \
     --train-portion=0.95 \
     --checkpoint-dir=$MODEL_DIR \
-    "$TRAIN_DIR"/"$FEATS".scp "$TRAIN_DIR"/utt2spk
+    ${TRAIN_DIR}/${FEATS}.scp ${TRAIN_DIR}/utt2spk
