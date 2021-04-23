@@ -150,9 +150,9 @@ def train_plda(args, model, device, train_loader):
 
             # compute model output and update PLDA
             x, y, z, output, w = model(data, embedding_only=True)
-            model.PLDA.update_plda(y, target)
+            model.plda.update_plda(y, target)
 
-    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.PLDA.counts.min(), model.PLDA.counts.max()))
+    logger.info("PLDA training epoch, count range %.2f to %.2f" % (model.plda.counts.min(),model.plda.counts.max()))
 
 
 def main():
@@ -241,7 +241,9 @@ def main():
                         help='training CE boost margin (default: 0)')
     parser.add_argument('--ResNet', action='store_true', default=False,
                         help='ResNet instead of TDNN (default False)')
-
+    parser.add_argument('--vb_flag', action='store_true', 
+                        help='use VB instead of leave-one-out (default False)')
+   
     args = parser.parse_args()
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -321,6 +323,7 @@ def main():
         'fixed_N': args.fixed_N,
         'r': args.enroll_R,
         'enroll_type': args.enroll_type,
+        'loo_flag': not args.vb_flag,
         'length_norm': args.length_norm,
         'resnet_flag': args.ResNet
     }
@@ -421,16 +424,10 @@ def main():
 
     # Initial training: no scheduler or validation
     if start_epoch <= args.init_epochs:
-        if init_scheduler is None and start_epoch == 1:
-            model.loo_flag = False  # Cold start can't use leave-one-out
-            logger.info(" turning off leave-one-out for initialization")
         logger.info("Starting initializer training from epoch %d for %d epochs", start_epoch, args.init_epochs)
         for epoch in range(start_epoch, args.init_epochs + 1):
             # train an epoch
             train(args, model, device, train_loader, init_optimizer, epoch, args.train_cost, args.train_boost)
-            if not model.loo_flag:
-                model.loo_flag = True
-                logger.info(" turning leave-one-out back on")
 
             # step learning rate
             if init_scheduler is not None:

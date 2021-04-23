@@ -30,7 +30,13 @@ DATA_COPY=0
 
 # Options
 MODEL_OPTS="--feature-dim=64 --embedding-dim=128 --layer-dim=768 --length_norm"
-FRAME_OPTS="--random-frame-size --min-frames=200 --max-frames=200"
+# NOTE:
+#   1. To refine/optimize the DNN for a specific frame-length, modify the min-frames and max-frames
+#      For example: to refine/optime to 2s segment length, set --min-frames=200 --max-frames=200
+#   2. For general training, it may be more advantageous to set a wider range for --min-frames and
+#       --max-frames, to allow the DNN to be trained for a more general purpose scenario
+#       For general training, we set --min-frames=100 and --max-frames=250
+FRAME_OPTS="--random-frame-size --min-frames=100 --max-frames=250"
 
 TRAIN_OPTS="--LLtype=Gauss --train_cost=CE --batch-size=512"
 

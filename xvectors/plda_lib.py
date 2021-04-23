@@ -204,6 +204,22 @@ def update_counts(x1, labels1, sums1, counts1, N0, rand_flag=False):
     return sums1, counts1
 
 
+# Function to compute counts within a set
+def compute_counts(x, labels):
+    d = x.shape[1]
+    classes = list(set(labels.tolist()))
+    M = len(classes)
+    sums = x.new_zeros(M, d)
+    counts = x.new_zeros(M, )
+    for n in range(M):
+        m = classes[n]
+        ind = (labels == m)
+        sums[m, :] = x[ind, :].sum(dim=0)
+        counts[m] = ind.sum()
+
+    return sums, counts
+
+
 class GaussLinear(nn.Module):
     def __init__(self, embedding_dim, num_classes, N0=9, fixed_N=True, discr_mean=False):
         super(GaussLinear, self).__init__()
@@ -249,7 +265,7 @@ class GaussLinear(nn.Module):
 
 
 class GaussQuadratic(nn.Module):
-    def __init__(self, embedding_dim, num_classes, N0=9, fixed_N=True, r=0.9, enroll_type='Bayes', N_dict={}, OOS=True):
+    def __init__(self, embedding_dim, num_classes, N0=9, fixed_N=True, r=0.9, enroll_type='Bayes', loo_flag=True, OOS=False):
         super(GaussQuadratic, self).__init__()
 
         self.num_classes = num_classes
@@ -262,7 +278,7 @@ class GaussQuadratic(nn.Module):
         self.register_buffer('sums', torch.zeros(num_classes,embedding_dim))
         #self.register_buffer('counts', torch.zeros(num_classes,))
         self.register_buffer('counts', torch.ones(num_classes,))
-        self.N_dict = N_dict
+        self.loo_flag = loo_flag
         self.OOS = OOS
         
         # Initialize stats
@@ -273,12 +289,13 @@ class GaussQuadratic(nn.Module):
 
         # Update models and compute Gaussian log-likelihoods
         with torch.no_grad():
-            self.means.data, self.cov.data = gmm_adapt(self.counts, torch.mm(self.sums,Ulda), d_wc, d_ac, self.r, self.enroll_type, self.N_dict)
+            self.means.data, self.cov.data = gmm_adapt(self.counts, torch.mm(self.sums,Ulda), d_wc, d_ac, self.r, self.enroll_type)
 
         N = x.shape[0]
         M = self.num_classes
+        vb_flag = not self.loo_flag
         if w is None:
-            LL = gmm_score(x, self.means, self.cov+d_wc[None,:])
+            LL = gmm_score_bayes(x, self.means, self.cov, d_wc[None,:], vb_flag)
 
             # Subtract open set LL
             if self.OOS:
@@ -287,7 +304,7 @@ class GaussQuadratic(nn.Module):
             # confidence weighting
             LL = x.new_zeros((N,M))
             for n in range(N):
-                LL[n,:] = gmm_score(x[n,None], self.means, self.cov+w[None,n])
+                LL[n,:] = gmm_score_bayes(x[n,None], self.means, self.cov, w[None,n], vb_flag)
                 if self.OOS:
                     LL[n,:] -= gmm_score(x, 0.0, d_ac[None,:]+w[None,n])
 
@@ -317,9 +334,9 @@ def compute_loss(x, y, output, w, labels, loss_type='CE', model=None, boost=0):
             loss = nloss
         acc = accuracy(output, labels)
     elif loss_type == 'GaussLoss':
-        loss, nloss, acc = gauss_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
+        loss, nloss, acc = gauss_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r)
     elif loss_type == 'BinLoss':
-        loss, nloss, acc = bin_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r, N_dict=model.N_dict)
+        loss, nloss, acc = bin_loss(y, w, labels, loo_flag=model.loo_flag, cov_ac=model.plda.d_ac, enroll_type=model.enroll_type, r=model.r)
     else:
         raise ValueError("Invalid loss type %s." % loss_type)
 
@@ -397,53 +414,67 @@ def bce_loss(LLR, labels, Pt=None):
 # Gaussian diarization loss in minibatch
 # Compute Gaussian cost across minibatch of samples vs. average
 # Note: w is ignored in this version
-def gauss_minibatch_ll(x1, w, labels, loo_flag=True, cov_wc1=None, cov_ac1=None, enroll_type='Bayes', r=0.9, N_dict=None, binary=False):
-
-    x = x1.cpu()  
+def gauss_minibatch_ll(x1, w, labels, loo_flag=True, cov_wc1=None, cov_ac1=None, enroll_type='Bayes', r=0.9, binary=False):
+    cpu_flag = True
+    if cpu_flag:
+        x = x1.cpu()
+        l2 = labels.clone().cpu()
+    else:
+        x = x1
+        l2 = labels.clone()
     N = x.shape[0]
     d = x.shape[1]
     classes = list(set(labels.tolist()))
     M = len(classes)
-    l2 = labels.clone().cpu()
-    sums = x.new_zeros((M,d))
-    counts = x.new_zeros((M,))
     if cov_wc1 is None:
-        cov_wc = x.new_ones((d,))
-    else:
-        cov_wc = cov_wc1.cpu() 
+        cov_wc1 = x.new_ones((d,))
     if cov_ac1 is None or len(cov_ac1.shape) > 1:
-        cov_ac = x.new_ones((d,))
+        cov_ac1 = x.new_ones((d,))
+    if cpu_flag:
+        cov_wc = cov_wc1.cpu()
+        cov_ac = cov_ac1.cpu()
     else:
-        cov_ac = cov_ac1.cpu() 
+        cov_wc = cov_wc1
+        cov_ac = cov_ac1
     cov_test = 1.0
-    if N_dict is None:
-        N_dict = {}
+    vb_flag = not loo_flag
 
-    # Compute stats for classes
     for m in range(M):
-        l2[labels==classes[m]] = m
-    sums, counts = update_counts(x, l2, sums, counts, N0=1000, rand_flag=0)
+        l2[labels == classes[m]] = m
 
-    # Compute models and log-likelihoods
-    means, cov = gmm_adapt(counts, sums, cov_wc, cov_ac, r, enroll_type, N_dict)
-    LL = gmm_score(x, means, cov+cov_test)
-
-    # Leave one out corrections
+    # Compute GMM log-likelihoods
     if loo_flag:
+
+        # Fast leave-one-out: same LL but fast gradients ignore centroids
+        sums, counts = compute_counts(x, l2)
+        means, cov = gmm_adapt(counts, sums, cov_wc, cov_ac, r, enroll_type)
+        LL = gmm_score_bayes(x, *gmm_adapt(counts, sums, cov_wc, cov_ac, r, enroll_type), cov_test, vb_flag)
         for n in range(N):
             m = classes.index(labels[n])
             if counts[m] > 1:
-                mu_model, cov_model = gmm_adapt(counts[m:m+1]-1, sums[m:m+1,:]-x[n,:], cov_wc, cov_ac, r, enroll_type, N_dict)
-                LL[n,m] = gmm_score(x[n:n+1,:], mu_model, cov_model+cov_test)
+                LL[n, m] = gmm_score_bayes(x[n:n + 1, :],
+                                           *gmm_adapt(counts[m:m + 1] - 1, sums[m:m + 1, :] - x[n, :], cov_wc, cov_ac,
+                                                      r, enroll_type),
+                                           cov_test, vb_flag)
+
+    else:
+        # Compute stats for classes
+        sums, counts = compute_counts(x, l2)
+
+        # Compute models and log-likelihoods
+        means, cov = gmm_adapt(counts, sums, cov_wc, cov_ac, r, enroll_type)
+
+        # Score models
+        LL = gmm_score_bayes(x, means, cov, cov_test, vb_flag)
 
     if binary:
         # Subtract open set LL
-        LL -= gmm_score(x, 0.0, cov_wc[None,:]+cov_ac[None,:])
-        prior = 1.0/M
+        LL -= gmm_score(x, 0.0, cov_wc[None, :] + cov_ac[None, :])
+        prior = 1.0 / M
 
     else:
         # Compute and apply prior
-        prior = counts/counts.sum()
+        prior = counts / counts.sum()
         logprior = torch.log(prior)
         LL += logprior
 
@@ -451,20 +482,20 @@ def gauss_minibatch_ll(x1, w, labels, loo_flag=True, cov_wc1=None, cov_ac1=None,
 
 
 # Gaussian diarization loss in minibatch
-def gauss_loss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9, N_dict=None):
+def gauss_loss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9):
 
     # Return normalized cross entropy cost
-    LL, prior, l2 = gauss_minibatch_ll(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r, N_dict)
+    LL, prior, l2 = gauss_minibatch_ll(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r)
     loss, nloss = nce_loss(LL, l2, prior)
     acc = accuracy(LL,l2)
     return loss, nloss, acc
 
 
 # Binary T/NT diarization loss in minibatch
-def bin_loss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9, N_dict=None):
+def bin_loss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type='Bayes', r=0.9):
 
     # Return normalized cross entropy cost
-    LL, prior, l2 = gauss_minibatch_ll(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r, N_dict, binary=True)
+    LL, prior, l2 = gauss_minibatch_ll(x, w, labels, loo_flag, cov_wc, cov_ac, enroll_type, r, binary=True)
     loss, nloss = bce_loss(LL, l2)
     acc = accuracy(LL,l2)
     return loss, nloss, acc
@@ -472,7 +503,7 @@ def bin_loss(x, w, labels, loo_flag=True, cov_wc=None, cov_ac=None, enroll_type=
 
 # Function for Bayesian adaptation of Gaussian model
 # Enroll type can be ML, MAP, or Bayes
-def gmm_adapt(cnt, xsum, cov_wc, cov_ac, r=0, enroll_type='ML', N_dict=None):
+def gmm_adapt(cnt, xsum, cov_wc, cov_ac, r=0, enroll_type='ML'):
 
     # Compute ML model
     cnt = torch.max(0*cnt+(1e-10),cnt)
@@ -490,7 +521,7 @@ def gmm_adapt(cnt, xsum, cov_wc, cov_ac, r=0, enroll_type='ML', N_dict=None):
         elif r == 1:
             Nsc = 0.0*cnt+1.0
         else:
-            Nsc = compute_Nsc(cnt, r, N_dict)
+            Nsc = compute_Nsc(cnt, r)
         cov_mean = cov_wc*Nsc[:,None]
 
         # MAP mean plus model uncertainty
@@ -504,26 +535,10 @@ def gmm_adapt(cnt, xsum, cov_wc, cov_ac, r=0, enroll_type='ML', N_dict=None):
     return mu_model, cov_model
 
 
-def compute_Nsc(cnts, r, N_dict=None):
+def compute_Nsc(cnts, r):
 
     # Correlation model for enrollment cuts (0=none,1=single-cut)
-    if N_dict is None:
-        N_dict = {}
-    Nsc = cnts.clone()
-    icnt = (0.5+cnts.cpu().numpy()).astype(np.int)
-    for cnt in np.unique(icnt):
-        if cnt not in N_dict.keys():
-            if cnt < 1:
-                Neff = cnt
-            else:
-                Neff = (cnt*(1-r)+2*r) / (1.0+r)
-
-            N_dict[cnt] = 1.0 / Neff
-            print("cnt not in dict", cnt, N_dict[cnt])
-        
-        # Update N_eff
-        mask = torch.from_numpy(np.array(icnt==cnt, dtype=np.uint8))
-        Nsc[mask] = N_dict[cnt]
+    Nsc = (1.0+r) / (cnts*(1-r)+2*r)
 
     return Nsc
 
@@ -541,3 +556,11 @@ def gmm_score(X, means, covars):
 
     return LLs
 
+def gmm_score_bayes(X, means, cov_model, cov_wc, vb_flag=False):
+
+    LLs = gmm_score(X, means, cov_model+cov_wc)
+    if vb_flag:
+        vb_penalty = -0.5*(cov_model/cov_wc).sum(axis=1)
+        LLs += vb_penalty
+
+    return LLs
