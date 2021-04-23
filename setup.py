@@ -4,7 +4,7 @@ import setuptools
 
 __author__ = 'Alan McCree, Greg Sell, Daniel Garcia Romero, Kiran Karra'
 __email__ = 'alan.mccree@jhu.edu,kiran.karra@jhuapl.edu'
-__version__ = '0.1'
+__version__ = '0.1.0'
 
 setuptools.setup(
     name='xvectors',
